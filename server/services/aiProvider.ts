@@ -1,4 +1,5 @@
 import Groq from 'groq-sdk';
+import { GoogleGenAI } from '@google/genai';
 
 export interface AICompletionOptions {
   temperature?: number;
@@ -9,6 +10,7 @@ export interface AICompletionOptions {
 export interface AIProvider {
   name: string;
   isAvailable(): boolean;
+  getModelName(): string;
   generateCompletion(
     prompt: string,
     systemPrompt?: string,
@@ -100,5 +102,83 @@ export class GroqProvider implements AIProvider {
   }
 }
 
-// Singleton export
+export class GeminiProvider implements AIProvider {
+  public readonly name = 'Gemini';
+  private aiClient: GoogleGenAI | null = null;
+  private readonly defaultModel = 'gemini-2.5-flash';
+
+  public isAvailable(): boolean {
+    return Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);
+  }
+
+  public getModelName(): string {
+    return this.defaultModel;
+  }
+
+  public async generateCompletion(
+    prompt: string,
+    systemPrompt?: string,
+    options: AICompletionOptions = {}
+  ): Promise<string> {
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not configured in environment variables.');
+    }
+
+    if (!this.aiClient) {
+      this.aiClient = new GoogleGenAI({ apiKey });
+    }
+
+    const config: any = {};
+    if (systemPrompt) {
+      config.systemInstruction = systemPrompt;
+    }
+    if (options.temperature !== undefined) {
+      config.temperature = options.temperature;
+    }
+    if (options.maxTokens !== undefined) {
+      config.maxOutputTokens = options.maxTokens;
+    }
+    if (options.jsonMode) {
+      config.responseMimeType = 'application/json';
+    }
+
+    try {
+      console.log(`[GeminiProvider] Invoking Gemini API with model: ${this.defaultModel}...`);
+      const response = await this.aiClient.models.generateContent({
+        model: this.defaultModel,
+        contents: prompt,
+        config,
+      });
+
+      const output = response.text || '';
+      if (!output) {
+        throw new Error('Gemini returned an empty response.');
+      }
+      return output;
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      console.error('[GeminiProvider] Gemini API execution error:', errorMsg);
+      throw new Error(`Gemini LLM Generation error: ${errorMsg}`);
+    }
+  }
+}
+
+// Singleton exports
 export const groqProvider = new GroqProvider();
+export const geminiProvider = new GeminiProvider();
+
+/**
+ * Resolves the primary available AI provider:
+ * Prefers Gemini (native in Google AI Studio) or Groq, or returns null for deterministic fallback.
+ */
+export function getActiveAIProvider(): AIProvider | null {
+  if (geminiProvider.isAvailable()) {
+    return geminiProvider;
+  }
+  if (groqProvider.isAvailable()) {
+    return groqProvider;
+  }
+  return null;
+}
+

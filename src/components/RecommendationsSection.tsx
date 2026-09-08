@@ -10,7 +10,9 @@ import {
   Search, 
   Info,
   ChevronRight,
-  Database
+  Database,
+  Compass,
+  Globe
 } from 'lucide-react';
 import type { RecommendationItem, RecommendationResponse, LearningResource } from '../types/index.ts';
 
@@ -21,6 +23,7 @@ interface RecommendationsSectionProps {
   onViewDetails: (item: RecommendationItem) => void;
   onViewResource: (res: LearningResource) => void;
   onRegenerate?: () => void;
+  onOpenDiscovery?: (skill?: string) => void;
 }
 
 export default function RecommendationsSection({
@@ -30,6 +33,7 @@ export default function RecommendationsSection({
   onViewDetails,
   onViewResource,
   onRegenerate,
+  onOpenDiscovery,
 }: RecommendationsSectionProps) {
   const [activeTab, setActiveTab] = useState<'high' | 'recommended' | 'optional' | 'all'>('high');
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,7 +69,18 @@ export default function RecommendationsSection({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {onOpenDiscovery && (
+            <button
+              onClick={() => onOpenDiscovery()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              title="Launch Stage 5A intelligent web and open learning resource discovery"
+            >
+              <Compass className="w-3.5 h-3.5 text-amber-300" />
+              <span>Intelligent Resource Discovery</span>
+            </button>
+          )}
+
           <span className="text-xs bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1">
             <Info className="w-3.5 h-3.5" />
             Demo Catalogue / Prototype Data

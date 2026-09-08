@@ -5,6 +5,8 @@ import { RecommendationService } from '../services/recommendationService.ts';
 import { DocumentService } from '../services/documentService.ts';
 import { QuizService } from '../services/quizService.ts';
 import { DomainPackService } from '../services/domainPackService.ts';
+import { LearningDiscoveryService } from '../services/learningDiscovery/discoveryService.ts';
+import { getActiveAIProvider } from '../services/aiProvider.ts';
 import { getDbStatus } from '../database/db.ts';
 
 const router = Router();
@@ -433,6 +435,85 @@ router.get('/recommendations/:id', async (req: Request, res: Response) => {
   }
 });
 
+// =========================================================================
+// STAGE 5A — Intelligent Learning Resource Discovery Endpoints
+// =========================================================================
+
+/**
+ * GET /api/learning-discovery
+ * Discovers and ranks relevant learning resources (hybrid: live web + demo catalogue)
+ * for a specific officer's skill gap, role, and operational assignment.
+ */
+router.get('/learning-discovery', async (req: Request, res: Response) => {
+  try {
+    const rawId = req.query.learner_id || req.query.id;
+    const learnerId = rawId ? parseInt(rawId as string, 10) : 1;
+    const skill = (req.query.skill as string) || '';
+    const forceRefresh = req.query.force_refresh === 'true' || req.query.refresh === 'true';
+
+    const discovery = await LearningDiscoveryService.discoverForLearner(learnerId, skill, forceRefresh);
+
+    return res.json({
+      success: true,
+      data: discovery,
+    });
+  } catch (error) {
+    console.error('Error in learning discovery:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error during learning resource discovery',
+    });
+  }
+});
+
+/**
+ * POST /api/learning-discovery/search
+ * Custom search endpoint allowing explicit structured criteria.
+ */
+router.post('/learning-discovery/search', async (req: Request, res: Response) => {
+  try {
+    const {
+      skill,
+      role,
+      assignment,
+      job_family,
+      department,
+      language,
+      learner_id,
+      force_refresh,
+    } = req.body;
+
+    if (!skill || typeof skill !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Skill gap parameter is required for learning discovery',
+      });
+    }
+
+    const discovery = await LearningDiscoveryService.discoverResources({
+      skillGap: skill,
+      roleName: role,
+      assignment,
+      jobFamilyName: job_family,
+      department,
+      preferredLanguage: language || 'en',
+      learnerId: learner_id ? parseInt(learner_id, 10) : undefined,
+      forceRefresh: Boolean(force_refresh),
+    });
+
+    return res.json({
+      success: true,
+      data: discovery,
+    });
+  } catch (error) {
+    console.error('Error in custom learning discovery search:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error during search',
+    });
+  }
+});
+
 // ==========================================
 // STAGE 4 — Learning Materials & AI Quiz Endpoints
 // ==========================================
@@ -441,7 +522,7 @@ router.get('/recommendations/:id', async (req: Request, res: Response) => {
  * POST /api/learning-materials/upload
  * Securely uploads and extracts learning documents (PDF, PPTX, DOCX, TXT).
  */
-router.post('/learning-materials/upload', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/learning-materials/upload', upload.single('file') as any, async (req: Request, res: Response) => {
   try {
     const file = req.file;
     if (!file) {
@@ -795,11 +876,15 @@ router.patch('/quizzes/:id/review', async (req: Request, res: Response) => {
 router.get('/health', (req: Request, res: Response) => {
   try {
     const dbStatus = getDbStatus();
+    const activeProvider = getActiveAIProvider();
     return res.json({
       status: 'healthy',
-      stage: 'Stage 4 - Groq-Powered Learning Material Intelligence & AI Quiz Generation',
+      stage: 'Stage 4 - AI-Powered Learning Material Intelligence & AI Quiz Generation',
       project: 'AI-Enabled Personalized Learning & Competency Gap Platform for India Official Statistical System',
       database: dbStatus,
+      ai_provider: activeProvider?.name || 'Deterministic Grounded Generator',
+      ai_available: Boolean(activeProvider?.isAvailable()),
+      gemini_configured: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0),
       groq_configured: Boolean(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim().length > 0),
       groq_model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
       timestamp: new Date().toISOString(),

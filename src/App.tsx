@@ -9,6 +9,7 @@ import AssessmentModal from './components/AssessmentModal.tsx';
 import NextLearningStepCard from './components/NextLearningStepCard.tsx';
 import RecommendationsSection from './components/RecommendationsSection.tsx';
 import CourseDetailModal from './components/CourseDetailModal.tsx';
+import LearningDiscoveryModal from './components/LearningDiscoveryModal.tsx';
 import AIQuizModal from './components/AIQuizModal.tsx';
 import UploadMaterialModal from './components/UploadMaterialModal.tsx';
 import ApiStatusBadge from './components/ApiStatusBadge.tsx';
@@ -36,7 +37,7 @@ import type {
 } from './types/index.ts';
 
 export default function App() {
-  const { t, setLanguage } = useLanguage();
+  const { t, setLanguage, language } = useLanguage();
   const [learner, setLearner] = useState<LearnerProfile | null>(null);
   const [competencies, setCompetencies] = useState<CompetencyItem[]>([]);
   const [skillGapReport, setSkillGapReport] = useState<SkillGapReport | null>(null);
@@ -53,6 +54,10 @@ export default function App() {
   // Stage 4 Upload & AI Quiz State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [activeDirectQuiz, setActiveDirectQuiz] = useState<Quiz | null>(null);
+
+  // Stage 5A Intelligent Discovery State
+  const [isDiscoveryOpen, setIsDiscoveryOpen] = useState<boolean>(false);
+  const [discoverySkill, setDiscoverySkill] = useState<string | null>(null);
 
   const [initialChecking, setInitialChecking] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
@@ -210,6 +215,21 @@ export default function App() {
     } catch (err) {
       console.error('Failed to refresh recommendations:', err);
     }
+  };
+
+  const handleOpenDiscovery = (skillName?: string) => {
+    if (skillName) {
+      setDiscoverySkill(skillName);
+    } else if (skillGapReport?.priority_areas?.[0]) {
+      setDiscoverySkill(skillGapReport.priority_areas[0].name);
+    } else if (recommendations?.next_step?.resource?.competency) {
+      setDiscoverySkill(recommendations.next_step.resource.competency);
+    } else if (competencies?.[0]) {
+      setDiscoverySkill(competencies[0].name);
+    } else {
+      setDiscoverySkill('Contract Management');
+    }
+    setIsDiscoveryOpen(true);
   };
 
   // Initial session restoration state
@@ -376,6 +396,7 @@ export default function App() {
               report={skillGapReport}
               loading={loading}
               onStartAssessment={handleOpenAssessment}
+              onFindResources={(skillName) => handleOpenDiscovery(skillName)}
             />
 
             {/* 4. YOUR NEXT LEARNING STEP */}
@@ -389,6 +410,7 @@ export default function App() {
                 setSelectedRecommendation(item);
                 setSelectedResourceFallback(null);
               }}
+              onDiscoverResources={(skillName) => handleOpenDiscovery(skillName)}
             />
 
             {/* 5. OTHER RECOMMENDATIONS & COURSE CATALOGUE */}
@@ -405,6 +427,7 @@ export default function App() {
                 setSelectedRecommendation(null);
               }}
               onRegenerate={handleRegenerateRecommendations}
+              onOpenDiscovery={(skillName) => handleOpenDiscovery(skillName)}
             />
           </>
         )}
@@ -416,6 +439,30 @@ export default function App() {
         learner={learner}
         onClose={() => setSelectedCompetency(null)}
       />
+
+      {/* Stage 5A Intelligent Learning Resource Discovery Modal */}
+      {isDiscoveryOpen && learner && (
+        <LearningDiscoveryModal
+          skillGap={discoverySkill || 'Survey Methodology'}
+          learnerId={learner.id}
+          language={language}
+          onClose={() => {
+            setIsDiscoveryOpen(false);
+            setDiscoverySkill(null);
+          }}
+          onViewResourceDetails={(resItem) => {
+            const matchedCatalogue = allCatalogue.find(
+              (c) => c.title.toLowerCase() === resItem.title.toLowerCase() ||
+                     (resItem.metadata_json?.catalogue_id && c.id === resItem.metadata_json.catalogue_id)
+            );
+            if (matchedCatalogue) {
+              setSelectedResourceFallback(matchedCatalogue);
+              setSelectedRecommendation(null);
+              setIsDiscoveryOpen(false);
+            }
+          }}
+        />
+      )}
 
       {/* Stage 2 Assessment & Dynamic Scoring Modal */}
       <AssessmentModal

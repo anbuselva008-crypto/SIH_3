@@ -36,8 +36,8 @@ export default function ProfileSetupView({ learner, onProfileComplete, onLogout 
   const [jobFamilies, setJobFamilies] = useState<JobFamily[]>([]);
   const [loadingFamilies, setLoadingFamilies] = useState<boolean>(true);
 
-  const [selectedFamilyId, setSelectedFamilyId] = useState<string>(learner.job_family_id || 'stat_cadre');
-  const [selectedRoleId, setSelectedRoleId] = useState<string>(learner.role_id || 'stat_officer');
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string>(learner.job_family_id || 'statistics');
+  const [selectedRoleId, setSelectedRoleId] = useState<string>(learner.role_id || 'statistical-officer');
 
   const [formData, setFormData] = useState({
     name: learner.name || '',
@@ -58,7 +58,7 @@ export default function ProfileSetupView({ learner, onProfileComplete, onLogout 
     let isMounted = true;
     fetchJobFamilies()
       .then((families) => {
-        if (isMounted) {
+        if (isMounted && families.length > 0) {
           setJobFamilies(families);
           setLoadingFamilies(false);
 
@@ -66,9 +66,10 @@ export default function ProfileSetupView({ learner, onProfileComplete, onLogout 
           const currentFamily = families.find(f => f.id === selectedFamilyId) || families[0];
           if (currentFamily) {
             setSelectedFamilyId(currentFamily.id);
-            const roleExists = currentFamily.roles.some(r => r.id === selectedRoleId);
-            if (!roleExists && currentFamily.roles.length > 0) {
-              setSelectedRoleId(currentFamily.roles[0].id);
+            const rolesList = currentFamily.roles || [];
+            const roleExists = rolesList.some(r => r.id === selectedRoleId);
+            if (!roleExists && rolesList.length > 0) {
+              setSelectedRoleId(rolesList[0].id);
             }
           }
         }
@@ -92,11 +93,13 @@ export default function ProfileSetupView({ learner, onProfileComplete, onLogout 
   const handleFamilyChange = (familyId: string) => {
     setSelectedFamilyId(familyId);
     const fam = jobFamilies.find(f => f.id === familyId);
-    if (fam && fam.roles.length > 0) {
-      const firstRole = fam.roles[0];
+    const roles = fam?.roles || [];
+    if (roles.length > 0) {
+      const firstRole = roles[0];
       setSelectedRoleId(firstRole.id);
-      if (firstRole.standard_departments.length > 0 && !formData.department) {
-        setFormData(prev => ({ ...prev, department: firstRole.standard_departments[0] }));
+      const defaultDept = (firstRole.standard_departments || firstRole.typical_departments || [])[0];
+      if (defaultDept && !formData.department) {
+        setFormData(prev => ({ ...prev, department: defaultDept }));
       }
       if (firstRole.default_qualification && !formData.educational_qualification) {
         setFormData(prev => ({ ...prev, educational_qualification: firstRole.default_qualification }));
@@ -109,9 +112,10 @@ export default function ProfileSetupView({ learner, onProfileComplete, onLogout 
     setSelectedRoleId(roleId);
     const roleDef = activeRoles.find(r => r.id === roleId);
     if (roleDef) {
+      const defaultDept = (roleDef.standard_departments || roleDef.typical_departments || [])[0];
       setFormData(prev => ({
         ...prev,
-        department: prev.department || roleDef.standard_departments[0] || '',
+        department: prev.department || defaultDept || '',
         educational_qualification: prev.educational_qualification || roleDef.default_qualification || '',
       }));
     }
@@ -383,11 +387,17 @@ export default function ProfileSetupView({ learner, onProfileComplete, onLogout 
                     onChange={(e) => handleRoleChange(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
                   >
-                    {activeRoles.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
+                    {activeRoles.length === 0 ? (
+                      <option value="" disabled>
+                        No cadre roles available
                       </option>
-                    ))}
+                    ) : (
+                      activeRoles.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                   {activeRole && (
                     <p className="text-[11px] text-emerald-700 font-medium mt-1">
@@ -414,8 +424,8 @@ export default function ProfileSetupView({ learner, onProfileComplete, onLogout 
                     {activeRole.required_competencies.map((comp, idx) => (
                       <div key={idx} className="p-2 rounded bg-slate-50 border border-slate-150 flex items-start justify-between gap-1">
                         <div>
-                          <div className="font-semibold text-slate-900 text-[11px]">{comp.competency_name}</div>
-                          <div className="text-[10px] text-slate-500">{comp.category} • Target {comp.benchmark_target}% ({comp.target_level})</div>
+                          <div className="font-semibold text-slate-900 text-[11px]">{comp.competency_name || (comp as any).name}</div>
+                          <div className="text-[10px] text-slate-500">{comp.category} • Target {comp.benchmark_target}% ({comp.target_level || (comp as any).required_proficiency})</div>
                         </div>
                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
                           comp.criticality === 'Core Role Prerequisite' 

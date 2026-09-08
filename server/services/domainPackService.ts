@@ -14,14 +14,20 @@ import type {
 
 export class DomainPackService {
   /**
-   * List all available Job Families
+   * List all available Job Families with their embedded roles
    */
   static getJobFamilies(): JobFamily[] {
-    return JOB_FAMILIES;
+    return JOB_FAMILIES.map((jf) => ({
+      ...jf,
+      roles: this.getRolesByJobFamily(jf.id)
+    }));
   }
 
   static getAllJobFamilies(): JobFamily[] {
-    return JOB_FAMILIES;
+    return JOB_FAMILIES.map((jf) => ({
+      ...jf,
+      roles: this.getRolesByJobFamily(jf.id)
+    }));
   }
 
   /**
@@ -39,10 +45,15 @@ export class DomainPackService {
   }
 
   /**
-   * Get specific Job Family by ID
+   * Get specific Job Family by ID with its embedded roles
    */
   static getJobFamilyById(id: string): JobFamily | undefined {
-    return JOB_FAMILIES.find((jf) => jf.id.toLowerCase() === id.toLowerCase());
+    const jf = JOB_FAMILIES.find((item) => item.id.toLowerCase() === id.toLowerCase());
+    if (!jf) return undefined;
+    return {
+      ...jf,
+      roles: this.getRolesByJobFamily(jf.id)
+    };
   }
 
   /**
@@ -74,23 +85,48 @@ export class DomainPackService {
     const byName = ROLES.find((r) => r.name.toLowerCase() === clean);
     if (byName) return byName;
 
-    // 3. Keyword heuristic match
-    if (clean.includes('civil') || clean.includes('engineer') || clean.includes('pwd') || clean.includes('works')) {
+    // 3. Specific role keyword matches (hierarchical from most specific to general)
+    // Engineering
+    if (clean.includes('superintending')) return ROLES.find((r) => r.id === 'superintending-engineer')!;
+    if (clean.includes('executive engineer')) return ROLES.find((r) => r.id === 'executive-engineer')!;
+    if (clean.includes('assistant engineer')) return ROLES.find((r) => r.id === 'assistant-engineer')!;
+    if (clean.includes('civil') || clean.includes('engineer') || clean.includes('pwd') || clean.includes('public works')) {
       return ROLES.find((r) => r.id === 'civil-engineer')!;
     }
+
+    // Statistics
+    if (clean.includes('senior statistical')) return ROLES.find((r) => r.id === 'senior-statistical-officer')!;
+    if (clean.includes('assistant director')) return ROLES.find((r) => r.id === 'assistant-director')!;
     if (clean.includes('statistic') || clean.includes('nsso') || clean.includes('survey')) {
       return ROLES.find((r) => r.id === 'statistical-officer')!;
     }
+
+    // Health
+    if (clean.includes('public health officer') || clean.includes('epidemiolog')) return ROLES.find((r) => r.id === 'public-health-officer')!;
+    if (clean.includes('health programme') || clean.includes('nhm coordinator')) return ROLES.find((r) => r.id === 'health-programme-officer')!;
     if (clean.includes('doctor') || clean.includes('medical') || clean.includes('health')) {
       return ROLES.find((r) => r.id === 'medical-officer')!;
     }
-    if (clean.includes('finance') || clean.includes('account') || clean.includes('audit') || clean.includes('budget')) {
+
+    // Finance
+    if (clean.includes('accounts officer') || clean.includes('pao')) return ROLES.find((r) => r.id === 'accounts-officer')!;
+    if (clean.includes('audit officer') || clean.includes('c&ag') || clean.includes('cag')) return ROLES.find((r) => r.id === 'audit-officer')!;
+    if (clean.includes('finance') || clean.includes('treasury') || clean.includes('budget')) {
       return ROLES.find((r) => r.id === 'finance-officer')!;
     }
-    if (clean.includes('it ') || clean.includes('software') || clean.includes('cyber') || clean.includes('computer') || clean.includes('technology')) {
+
+    // IT
+    if (clean.includes('cyber') || clean.includes('security') || clean.includes('cert-in')) return ROLES.find((r) => r.id === 'cybersecurity-officer')!;
+    if (clean.includes('software') || clean.includes('developer')) return ROLES.find((r) => r.id === 'software-engineer')!;
+    if (clean.includes('system admin') || clean.includes('sysadmin') || clean.includes('network admin')) return ROLES.find((r) => r.id === 'system-administrator')!;
+    if (clean.includes('it ') || clean.includes('it-') || clean.includes('information tech') || clean.includes('informatics')) {
       return ROLES.find((r) => r.id === 'it-officer')!;
     }
-    if (clean.includes('admin') || clean.includes('section officer') || clean.includes('under sec')) {
+
+    // Administration
+    if (clean.includes('under sec') || clean.includes('under-sec')) return ROLES.find((r) => r.id === 'under-secretary')!;
+    if (clean.includes('section officer')) return ROLES.find((r) => r.id === 'section-officer')!;
+    if (clean.includes('admin') || clean.includes('secretariat') || clean.includes('dopt')) {
       return ROLES.find((r) => r.id === 'administrative-officer')!;
     }
 

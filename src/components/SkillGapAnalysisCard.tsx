@@ -1,16 +1,18 @@
-import { AlertTriangle, TrendingUp, CheckCircle2, Target, ArrowRight, ShieldAlert, Zap } from 'lucide-react';
+import { AlertTriangle, TrendingUp, CheckCircle2, Target, ArrowRight, ShieldAlert, Zap, Compass } from 'lucide-react';
 import type { SkillGapReport, SkillGapItem } from '../types/index.ts';
 
 interface SkillGapAnalysisProps {
   report: SkillGapReport | null;
   loading: boolean;
   onStartAssessment: (competencyName?: string) => void;
+  onFindResources?: (competencyName: string) => void;
 }
 
 export default function SkillGapAnalysisCard({
   report,
   loading,
   onStartAssessment,
+  onFindResources,
 }: SkillGapAnalysisProps) {
   if (loading) {
     return (
@@ -170,17 +172,31 @@ export default function SkillGapAnalysisCard({
                     </div>
                   </div>
 
-                  {/* Score vs Target Delta display */}
-                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/80">
+                  {/* Score vs Target Delta display & Action Buttons */}
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/80 shrink-0">
                     <div className="text-xs font-semibold text-slate-700">
                       Score: <span className="font-bold text-slate-900">{item.score}%</span> / Target: {item.benchmark_target}%
                     </div>
-                    <button
-                      onClick={() => onStartAssessment(item.name)}
-                      className="text-[11px] font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1 hover:underline cursor-pointer"
-                    >
-                      Assess Competency <ArrowRight className="w-3 h-3" />
-                    </button>
+                    
+                    <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+                      {onFindResources && (
+                        <button
+                          onClick={() => onFindResources(item.name)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold shadow-2xs transition-colors cursor-pointer"
+                          title="Discover web and catalogue courses for this skill"
+                        >
+                          <Compass className="w-3 h-3 text-amber-300" />
+                          <span>Find Resources</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => onStartAssessment(item.name)}
+                        className="text-[11px] font-semibold text-slate-600 hover:text-blue-700 flex items-center gap-1 hover:underline cursor-pointer"
+                      >
+                        Assess <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 

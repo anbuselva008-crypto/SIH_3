@@ -16,7 +16,9 @@ import type {
   QuizAnswerDetail,
   JobFamily,
   RoleDefinition,
-  FutureSkill
+  FutureSkill,
+  DiscoveryResponse,
+  DiscoveredResource
 } from '../types/index.ts';
 
 const BASE_URL = '/api';
@@ -476,4 +478,62 @@ export async function fetchFutureSkills(roleId?: string): Promise<FutureSkill[]>
   const result: ApiResponse<FutureSkill[]> = await response.json();
   return result.data || [];
 }
+
+// ==========================================
+// STAGE 5A — Learning Resource Discovery API
+// ==========================================
+
+/**
+ * Discovers and ranks relevant learning resources for an officer's skill gap.
+ * Merges live web discovery with the prototype catalogue fallback.
+ */
+export async function fetchLearningDiscovery(
+  learnerId: number,
+  skill?: string,
+  forceRefresh: boolean = false
+): Promise<DiscoveryResponse> {
+  const params = new URLSearchParams();
+  params.append('learner_id', String(learnerId));
+  if (skill) params.append('skill', skill);
+  if (forceRefresh) params.append('force_refresh', 'true');
+
+  const response = await fetch(`${BASE_URL}/learning-discovery?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(`Learning discovery failed (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to discover learning resources');
+  }
+  return result.data;
+}
+
+/**
+ * Custom search for learning resources across specific role/assignment/skill parameters.
+ */
+export async function searchLearningDiscovery(params: {
+  skill: string;
+  role?: string;
+  assignment?: string;
+  job_family?: string;
+  department?: string;
+  language?: string;
+  learner_id?: number;
+  force_refresh?: boolean;
+}): Promise<DiscoveryResponse> {
+  const response = await fetch(`${BASE_URL}/learning-discovery/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!response.ok) {
+    throw new Error(`Custom learning discovery search failed (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to search learning resources');
+  }
+  return result.data;
+}
+
 

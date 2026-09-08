@@ -1,4 +1,4 @@
-import { groqProvider } from './aiProvider.ts';
+import { groqProvider, getActiveAIProvider } from './aiProvider.ts';
 import { QuizValidationService, type ValidatedQuestion } from './quizValidationService.ts';
 import { TextChunker, type DocumentChunk } from './textChunker.ts';
 import type { Learner } from '../database/models.ts';
@@ -93,11 +93,12 @@ Ensure output is valid JSON with key "questions".`;
 
     let generatedQuestions: ValidatedQuestion[] = [];
 
-    // Attempt Groq LLM Generation if available
-    if (groqProvider.isAvailable()) {
+    // Attempt LLM Generation if available (Gemini or Groq)
+    const activeProvider = getActiveAIProvider();
+    if (activeProvider && activeProvider.isAvailable()) {
       try {
-        console.log(`[QuizGenerationService] Requesting ${questionCount} questions from Groq LLM...`);
-        const rawJsonString = await groqProvider.generateCompletion(userPrompt, systemPrompt, {
+        console.log(`[QuizGenerationService] Requesting ${questionCount} questions from ${activeProvider.name} LLM...`);
+        const rawJsonString = await activeProvider.generateCompletion(userPrompt, systemPrompt, {
           temperature: 0.15,
           maxTokens: 3500,
           jsonMode: true,
@@ -114,24 +115,24 @@ Ensure output is valid JSON with key "questions".`;
 
         if (validation.isValid) {
           console.log(
-            `[QuizGenerationService] Groq generated ${validation.validQuestions.length} validated questions.`
+            `[QuizGenerationService] ${activeProvider.name} generated ${validation.validQuestions.length} validated questions.`
           );
           generatedQuestions = validation.validQuestions;
         } else {
           console.warn(
-            '[QuizGenerationService] Groq validation failed:',
+            `[QuizGenerationService] ${activeProvider.name} validation failed:`,
             validation.reasons
           );
         }
       } catch (err) {
         console.warn(
-          '[QuizGenerationService] Groq invocation failed or timed out. Engaging grounded fallback generator.',
+          `[QuizGenerationService] ${activeProvider.name} invocation failed or timed out. Engaging grounded fallback generator.`,
           err
         );
       }
     } else {
       console.log(
-        '[QuizGenerationService] GROQ_API_KEY not configured. Using deterministic grounded generator for prototype.'
+        '[QuizGenerationService] No active LLM API key configured (GEMINI_API_KEY or GROQ_API_KEY). Using deterministic grounded generator for prototype.'
       );
     }
 

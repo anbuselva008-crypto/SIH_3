@@ -265,11 +265,15 @@ export interface RoleDefinition {
   id: string;
   name: string;
   job_family_id: string;
+  domain?: string;
+  description?: string;
+  typical_departments?: string[];
   standard_departments: string[];
   typical_assignments: string[];
   default_qualification: string;
   required_competencies: RequiredCompetencySpec[];
   future_skills_focus: string;
+  future_competencies?: string[];
 }
 
 export interface JobFamily {
@@ -277,7 +281,9 @@ export interface JobFamily {
   name: string;
   code: string;
   description: string;
-  icon_name: string;
+  icon_name?: string;
+  icon?: string;
+  domain_color?: string;
   roles: RoleDefinition[];
 }
 
@@ -293,5 +299,85 @@ export interface FutureSkill {
 }
 
 export type SupportedLanguage = 'en' | 'hi' | 'ta' | 'te' | 'bn' | 'mr' | 'gu' | 'kn' | 'ml' | 'pa' | 'or';
+
+// ==========================================
+// STAGE 5A — Intelligent Learning Discovery Types
+// ==========================================
+
+export type DiscoveryProviderType = 
+  | 'Government' 
+  | 'University' 
+  | 'Institutional' 
+  | 'Educational Platform' 
+  | 'Open Learning';
+
+export type DiscoverySourceTier = 1 | 2 | 3 | 4;
+
+export type DiscoverySourceType = 'web_discovered' | 'demo_catalogue';
+
+export type DiscoveryVerificationStatus = 'Verified' | 'Institutional' | 'Not Verified';
+
+export interface RankingBreakdown {
+  skillMatch: number;
+  assignmentMatch: number;
+  roleMatch: number;
+  jobFamilyMatch: number;
+  sourceQuality: number;
+  difficultyFit: number;
+  languageFit: number;
+  totalScore: number;
+}
+
+export interface DiscoveredResource {
+  id: string | number;
+  title: string;
+  url: string;
+  canonical_url: string;
+  provider_name: string;
+  provider_type: DiscoveryProviderType;
+  source_tier: DiscoverySourceTier;
+  description: string;
+  primary_competency: string;
+  secondary_competencies: string[];
+  relevant_job_families: string[];
+  relevant_roles: string[];
+  relevant_assignments: string[];
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced' | 'All Levels' | null;
+  language: string;
+  estimated_duration: string | null;
+  source_type: DiscoverySourceType;
+  verification_status: DiscoveryVerificationStatus;
+  discovered_at: string;
+  last_verified_at?: string;
+  ranking_score: number;
+  ranking_breakdown?: RankingBreakdown;
+  match_reason: string;
+  is_best_match?: boolean;
+  metadata_json?: Record<string, any>;
+}
+
+export interface DiscoveryResponse {
+  success: boolean;
+  status: 'success' | 'fallback';
+  status_message: string;
+  best_match: DiscoveredResource | null;
+  other_options: DiscoveredResource[];
+  all_resources: DiscoveredResource[];
+  total_found: number;
+  source_breakdown: {
+    web_discovered: number;
+    demo_catalogue: number;
+  };
+  search_intent?: string;
+  learner_context: {
+    learner_id?: number;
+    role: string;
+    assignment: string;
+    job_family: string;
+    skill_gap: string;
+    preferred_language: string;
+  };
+}
+
 
 

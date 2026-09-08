@@ -7,6 +7,7 @@ export interface JobFamily {
   description: string;
   icon: string;
   domain_color: string;
+  roles?: RoleDefinition[];
 }
 
 export interface RoleDefinition {
@@ -16,14 +17,20 @@ export interface RoleDefinition {
   domain: string;
   description: string;
   typical_departments: string[];
+  standard_departments?: string[];
   typical_assignments: string[];
+  default_qualification?: string;
+  future_skills_focus?: string;
   required_competencies: Array<{
     name: string;
+    competency_name?: string;
     category: string;
     required_proficiency: 'Beginner' | 'Intermediate' | 'Advanced';
+    target_level?: string;
     benchmark_target: number;
     criticality: string;
     is_mandatory: boolean;
+    description?: string;
   }>;
   future_competencies: string[];
 }

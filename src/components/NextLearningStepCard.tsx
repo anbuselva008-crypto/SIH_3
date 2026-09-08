@@ -5,12 +5,14 @@ interface NextLearningStepCardProps {
   item: RecommendationItem | null;
   onViewDetails: (item: RecommendationItem) => void;
   onPracticeQuiz?: (item: RecommendationItem) => void;
+  onDiscoverResources?: (skill: string) => void;
 }
 
 export default function NextLearningStepCard({
   item,
   onViewDetails,
   onPracticeQuiz,
+  onDiscoverResources,
 }: NextLearningStepCardProps) {
   if (!item) {
     return (
@@ -135,6 +137,16 @@ export default function NextLearningStepCard({
                 >
                   <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                   <span>Practice with AI Quiz</span>
+                </button>
+              )}
+
+              {onDiscoverResources && (
+                <button
+                  onClick={() => onDiscoverResources(resource.competency)}
+                  className="w-full sm:w-auto px-4 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Compass className="w-3.5 h-3.5 text-blue-700" />
+                  <span>Discover More Web Resources</span>
                 </button>
               )}
             </div>
