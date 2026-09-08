@@ -1,6 +1,6 @@
 {
   "name": "Official Statistical System Competency Platform",
-  "description": "AI-Enabled Personalized Learning and Competency Gap Platform for India's Official Statistical System - Stage 1.5 Officer Onboarding, Stage 2 Assessment & Dynamic Skill Gap Engine",
+  "description": "AI-Enabled Personalized Learning and Competency Gap Platform for India's Official Statistical System - Officer Onboarding, Assessment, Dynamic Skill Gap Scoring, and Personalized Learning Recommendation Engine (iGOT & NSSTA)",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

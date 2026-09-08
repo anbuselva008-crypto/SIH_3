@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { LearnerService } from '../services/learnerService.ts';
+import { RecommendationService } from '../services/recommendationService.ts';
 import { getDbStatus } from '../database/db.ts';
 
 const router = Router();
@@ -118,6 +119,13 @@ router.post('/profile/setup', async (req: Request, res: Response) => {
       previous_training,
     });
 
+    // Automatically initialize personalized recommendations based on profile
+    try {
+      await RecommendationService.generateRecommendations(updatedProfile.id);
+    } catch (e) {
+      console.warn('Initial recommendation calculation deferred:', e);
+    }
+
     return res.json({
       success: true,
       message: 'Officer profile successfully configured. Ready for competency assessment.',
@@ -220,6 +228,13 @@ router.post('/assessment/submit', async (req: Request, res: Response) => {
 
     const evaluation = await LearnerService.submitAssessment(learnerId, answers);
 
+    // Refresh personalized recommendations dynamically after scores update
+    try {
+      await RecommendationService.generateRecommendations(learnerId);
+    } catch (e) {
+      console.warn('Recommendation refresh after assessment deferred:', e);
+    }
+
     return res.json({
       success: true,
       message: 'Assessment evaluated successfully. Competency scores dynamically updated in database.',
@@ -263,6 +278,7 @@ router.get('/skill-gap', async (req: Request, res: Response) => {
 router.post('/assessment/reset', async (req: Request, res: Response) => {
   try {
     await LearnerService.resetBaseline();
+    await RecommendationService.generateRecommendations(1);
     const learner = await LearnerService.getLearnerProfile(1);
     const competencies = await LearnerService.getCompetencies(1);
     const gapReport = await LearnerService.getSkillGapAnalysis(1);
@@ -286,6 +302,113 @@ router.post('/assessment/reset', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/learning-resources
+ * Retrieves the full catalogue of official statistical learning resources (iGOT & NSSTA).
+ */
+router.get('/learning-resources', async (req: Request, res: Response) => {
+  try {
+    const resources = await RecommendationService.getAllLearningResources();
+    return res.json({
+      success: true,
+      count: resources.length,
+      data: resources,
+    });
+  } catch (error) {
+    console.error('Error fetching learning resources catalogue:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error while fetching learning resources',
+    });
+  }
+});
+
+/**
+ * GET /api/learning-resources/:id
+ * Retrieves specific learning resource details.
+ */
+router.get('/learning-resources/:id', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const resource = await RecommendationService.getLearningResourceById(id);
+    if (!resource) {
+      return res.status(404).json({
+        success: false,
+        error: 'Learning resource not found in catalogue',
+      });
+    }
+    return res.json({
+      success: true,
+      data: resource,
+    });
+  } catch (error) {
+    console.error('Error fetching learning resource:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error while fetching resource details',
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations
+ * Generates or retrieves personalized learning recommendations for the specified officer.
+ */
+router.get('/recommendations', async (req: Request, res: Response) => {
+  try {
+    const rawId = req.query.learner_id || req.query.id;
+    const learnerId = rawId ? parseInt(rawId as string, 10) : 1;
+
+    // Optional query param ?regenerate=true to force re-evaluation
+    const regenerate = req.query.regenerate === 'true';
+
+    let recommendations;
+    if (regenerate) {
+      recommendations = await RecommendationService.generateRecommendations(learnerId);
+    } else {
+      recommendations = await RecommendationService.getRecommendations(learnerId);
+    }
+
+    return res.json({
+      success: true,
+      data: recommendations,
+    });
+  } catch (error) {
+    console.error('Error generating personalized recommendations:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error while generating recommendations',
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/:id
+ * Retrieves a specific recommendation by its record ID.
+ */
+router.get('/recommendations/:id', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const recommendation = await RecommendationService.getRecommendationById(id);
+    if (!recommendation) {
+      return res.status(404).json({
+        success: false,
+        error: 'Recommendation record not found',
+      });
+    }
+    return res.json({
+      success: true,
+      data: recommendation,
+    });
+  } catch (error) {
+    console.error('Error fetching recommendation record:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error while fetching recommendation',
+    });
+  }
+});
+
+/**
  * GET /api/health
  * Verifies backend and database connectivity.
  */
@@ -294,7 +417,7 @@ router.get('/health', (req: Request, res: Response) => {
     const dbStatus = getDbStatus();
     return res.json({
       status: 'healthy',
-      stage: 'Stage 2 - Assessment, Dynamic Scoring & Skill Gap Analysis',
+      stage: 'Stage 3 - Personalized Learning Recommendation Engine',
       project: 'AI-Enabled Personalized Learning & Competency Gap Platform for India Official Statistical System',
       database: dbStatus,
       timestamp: new Date().toISOString(),

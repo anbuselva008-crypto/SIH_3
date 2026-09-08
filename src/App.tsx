@@ -6,17 +6,41 @@ import CompetencyCard from './components/CompetencyCard.tsx';
 import CompetencyModal from './components/CompetencyModal.tsx';
 import SkillGapAnalysisCard from './components/SkillGapAnalysisCard.tsx';
 import AssessmentModal from './components/AssessmentModal.tsx';
+import NextLearningStepCard from './components/NextLearningStepCard.tsx';
+import RecommendationsSection from './components/RecommendationsSection.tsx';
+import CourseDetailModal from './components/CourseDetailModal.tsx';
 import ApiStatusBadge from './components/ApiStatusBadge.tsx';
 import LoginView from './components/LoginView.tsx';
 import ProfileSetupView from './components/ProfileSetupView.tsx';
-import { getLearner, getCompetencies, getSkillGapReport, resetBaseline } from './services/api.ts';
-import type { LearnerProfile, CompetencyItem, SkillGapReport, AssessmentEvaluation } from './types/index.ts';
+import { 
+  getLearner, 
+  getCompetencies, 
+  getSkillGapReport, 
+  getRecommendations, 
+  getLearningResources, 
+  resetBaseline 
+} from './services/api.ts';
+import type { 
+  LearnerProfile, 
+  CompetencyItem, 
+  SkillGapReport, 
+  AssessmentEvaluation,
+  RecommendationResponse,
+  RecommendationItem,
+  LearningResource
+} from './types/index.ts';
 
 export default function App() {
   const [learner, setLearner] = useState<LearnerProfile | null>(null);
   const [competencies, setCompetencies] = useState<CompetencyItem[]>([]);
   const [skillGapReport, setSkillGapReport] = useState<SkillGapReport | null>(null);
+  const [recommendations, setRecommendations] = useState<RecommendationResponse | null>(null);
+  const [allCatalogue, setAllCatalogue] = useState<LearningResource[]>([]);
+  
   const [selectedCompetency, setSelectedCompetency] = useState<CompetencyItem | null>(null);
+  const [selectedRecommendation, setSelectedRecommendation] = useState<RecommendationItem | null>(null);
+  const [selectedResourceFallback, setSelectedResourceFallback] = useState<LearningResource | null>(null);
+  
   const [isAssessmentOpen, setIsAssessmentOpen] = useState<boolean>(false);
   const [assessmentFilter, setAssessmentFilter] = useState<string | null>(null);
 
@@ -57,14 +81,18 @@ export default function App() {
     try {
       setLoading(true);
       setError(null);
-      const [learnerData, competenciesData, gapData] = await Promise.all([
+      const [learnerData, competenciesData, gapData, recsData, catalogueData] = await Promise.all([
         getLearner(learnerId),
         getCompetencies(learnerId),
         getSkillGapReport(learnerId),
+        getRecommendations(learnerId),
+        getLearningResources(),
       ]);
       setLearner(learnerData);
       setCompetencies(competenciesData);
       setSkillGapReport(gapData);
+      setRecommendations(recsData);
+      setAllCatalogue(catalogueData);
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
       setError(err instanceof Error ? err.message : 'Failed to connect to backend REST API');
@@ -110,6 +138,10 @@ export default function App() {
     setLearner(null);
     setCompetencies([]);
     setSkillGapReport(null);
+    setRecommendations(null);
+    setAllCatalogue([]);
+    setSelectedRecommendation(null);
+    setSelectedResourceFallback(null);
     setError(null);
     setNotification('Successfully signed out of officer portal.');
     setTimeout(() => setNotification(null), 4000);
@@ -124,12 +156,13 @@ export default function App() {
     if (!learner) return;
     // Dynamically update dashboard state with new database values
     setSkillGapReport(evaluation.updated_gap_report);
-    // Reload learner and competencies to synchronize UI with PostgreSQL
+    // Reload learner, competencies, and recommendations to synchronize UI with PostgreSQL
     getLearner(learner.id).then(setLearner).catch(console.error);
     getCompetencies(learner.id).then(setCompetencies).catch(console.error);
+    getRecommendations(learner.id, true).then(setRecommendations).catch(console.error);
 
     setNotification(
-      `Assessment evaluated (${evaluation.overall_assessment_percentage}%). Competency scores & skill gap report dynamically updated in database.`
+      `Assessment evaluated (${evaluation.overall_assessment_percentage}%). Competency scores & personalized recommendations dynamically updated in database.`
     );
     setTimeout(() => setNotification(null), 6000);
   };
@@ -142,13 +175,27 @@ export default function App() {
       setLearner(result.learner);
       setCompetencies(result.competencies);
       setSkillGapReport(result.gapReport);
-      setNotification('Demo baseline reset: Stats 75%, Python 40%, Data Analysis 55%, Data Viz 80%.');
+      const recs = await getRecommendations(result.learner.id, true);
+      setRecommendations(recs);
+      setNotification('Demo baseline reset: Stats 75%, Python 40%, Data Analysis 55%, Data Viz 80%. Recommendations re-evaluated.');
       setTimeout(() => setNotification(null), 5000);
     } catch (err) {
       console.error('Failed to reset baseline:', err);
       alert('Failed to reset baseline.');
     } finally {
       setResetting(false);
+    }
+  };
+
+  const handleRegenerateRecommendations = async () => {
+    if (!learner) return;
+    try {
+      const recs = await getRecommendations(learner.id, true);
+      setRecommendations(recs);
+      setNotification('Personalized learning recommendations refreshed based on latest cadre scores.');
+      setTimeout(() => setNotification(null), 4000);
+    } catch (err) {
+      console.error('Failed to refresh recommendations:', err);
     }
   };
 
@@ -260,24 +307,17 @@ export default function App() {
         {/* Content Loaded */}
         {!loading && (
           <>
-            {/* 1. Learner Profile Section */}
+            {/* 1. PROFILE */}
             <LearnerProfileCard learner={learner} />
 
-            {/* 2. STAGE 2: Skill Gap Analysis & Priority Areas Module */}
-            <SkillGapAnalysisCard
-              report={skillGapReport}
-              loading={loading}
-              onStartAssessment={handleOpenAssessment}
-            />
-
-            {/* 3. Competency Records Section */}
+            {/* 2. YOUR SKILLS (Competency Assessment Records) */}
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4 text-blue-700" />
                     <h2 className="text-base font-bold text-slate-900">
-                      Competency Assessment Records
+                      Your Skills (Competency Records)
                     </h2>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
@@ -316,6 +356,38 @@ export default function App() {
                 ))}
               </div>
             </div>
+
+            {/* 3. YOUR SKILL GAPS (Skill Gap Analysis & Priority Areas Module) */}
+            <SkillGapAnalysisCard
+              report={skillGapReport}
+              loading={loading}
+              onStartAssessment={handleOpenAssessment}
+            />
+
+            {/* 4. YOUR NEXT LEARNING STEP */}
+            <NextLearningStepCard
+              item={recommendations?.next_step || null}
+              onViewDetails={(item) => {
+                setSelectedRecommendation(item);
+                setSelectedResourceFallback(null);
+              }}
+            />
+
+            {/* 5. OTHER RECOMMENDATIONS & COURSE CATALOGUE */}
+            <RecommendationsSection
+              recommendations={recommendations}
+              allCatalogue={allCatalogue}
+              loading={loading}
+              onViewDetails={(item) => {
+                setSelectedRecommendation(item);
+                setSelectedResourceFallback(null);
+              }}
+              onViewResource={(res) => {
+                setSelectedResourceFallback(res);
+                setSelectedRecommendation(null);
+              }}
+              onRegenerate={handleRegenerateRecommendations}
+            />
           </>
         )}
       </main>
@@ -334,6 +406,16 @@ export default function App() {
         filterCompetency={assessmentFilter}
         onClose={() => setIsAssessmentOpen(false)}
         onAssessmentCompleted={handleAssessmentCompleted}
+      />
+
+      {/* Stage 3 Course Details Modal */}
+      <CourseDetailModal
+        item={selectedRecommendation}
+        resourceFallback={selectedResourceFallback}
+        onClose={() => {
+          setSelectedRecommendation(null);
+          setSelectedResourceFallback(null);
+        }}
       />
 
       {/* Enterprise Government Style Footer */}

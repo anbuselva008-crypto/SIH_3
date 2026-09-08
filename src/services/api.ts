@@ -5,6 +5,9 @@ import type {
   AssessmentQuestion, 
   AssessmentEvaluation, 
   SkillGapReport, 
+  LearningResource,
+  RecommendationItem,
+  RecommendationResponse,
   ApiResponse, 
   HealthResponse 
 } from '../types/index.ts';
@@ -190,6 +193,52 @@ export async function resetBaseline(): Promise<{
   const result = await response.json();
   if (!result.success) {
     throw new Error(result.error || 'Failed to reset baseline');
+  }
+  return result.data;
+}
+
+/**
+ * Fetches personalized learning recommendations for the officer
+ */
+export async function getRecommendations(learnerId: number, regenerate: boolean = false): Promise<RecommendationResponse> {
+  const url = `${BASE_URL}/recommendations?learner_id=${learnerId}${regenerate ? '&regenerate=true' : ''}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch recommendations (HTTP ${response.status})`);
+  }
+  const result: ApiResponse<RecommendationResponse> = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to retrieve recommendations');
+  }
+  return result.data;
+}
+
+/**
+ * Fetches the catalogue of all learning resources
+ */
+export async function getLearningResources(): Promise<LearningResource[]> {
+  const response = await fetch(`${BASE_URL}/learning-resources`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch learning resources catalogue (HTTP ${response.status})`);
+  }
+  const result: ApiResponse<LearningResource[]> = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to retrieve learning resources');
+  }
+  return result.data;
+}
+
+/**
+ * Fetches single recommendation details
+ */
+export async function getRecommendationById(id: number): Promise<RecommendationItem> {
+  const response = await fetch(`${BASE_URL}/recommendations/${id}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch recommendation (HTTP ${response.status})`);
+  }
+  const result: ApiResponse<RecommendationItem> = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to retrieve recommendation details');
   }
   return result.data;
 }

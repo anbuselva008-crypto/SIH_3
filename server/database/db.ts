@@ -62,6 +62,35 @@ export function initDatabase() {
       scores_breakdown TEXT NOT NULL,
       completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS learning_resources (
+      id SERIAL PRIMARY KEY,
+      title VARCHAR(200) NOT NULL,
+      source VARCHAR(50) NOT NULL,
+      competency VARCHAR(100) NOT NULL,
+      secondary_competencies TEXT NOT NULL,
+      target_roles TEXT NOT NULL,
+      relevant_departments TEXT NOT NULL,
+      relevant_assignments TEXT NOT NULL,
+      min_recommended_score INTEGER DEFAULT 0,
+      difficulty_level VARCHAR(50) NOT NULL,
+      prerequisites TEXT NOT NULL,
+      estimated_duration VARCHAR(100) NOT NULL,
+      learning_type VARCHAR(100) NOT NULL,
+      description TEXT NOT NULL,
+      expected_outcome TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS recommendations (
+      id SERIAL PRIMARY KEY,
+      learner_id INTEGER REFERENCES learners(id) ON DELETE CASCADE,
+      learning_resource_id INTEGER REFERENCES learning_resources(id) ON DELETE CASCADE,
+      recommendation_score INTEGER NOT NULL,
+      priority VARCHAR(50) NOT NULL,
+      reason TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Check if data already exists
@@ -70,7 +99,14 @@ export function initDatabase() {
     console.log('[Database] Seeding initial Stage 1 & Stage 2 baseline...');
     seedBaselineData();
     seedQuestions();
+    seedLearningResources();
     console.log('[Database] Seed completed successfully.');
+  } else {
+    // Ensure learning resources are seeded
+    const resCount = pgInstance.public.many('SELECT COUNT(*) as c FROM learning_resources')[0];
+    if (Number(resCount.c) === 0) {
+      seedLearningResources();
+    }
   }
 }
 
@@ -237,6 +273,231 @@ export function seedQuestions() {
        '${q.text.replace(/'/g, "''")}', '${q.a.replace(/'/g, "''")}', '${q.b.replace(/'/g, "''")}', 
        '${q.c.replace(/'/g, "''")}', '${q.d.replace(/'/g, "''")}', ${q.correct}, 
        '${q.explanation.replace(/'/g, "''")}', '${q.tag.replace(/'/g, "''")}', 1);
+    `);
+  }
+}
+
+export function seedLearningResources() {
+  pgInstance.public.none('DELETE FROM recommendations; DELETE FROM learning_resources;');
+
+  const resources = [
+    {
+      id: 1,
+      title: 'Python for Data Analysis',
+      source: 'iGOT',
+      competency: 'Python',
+      secondary_competencies: JSON.stringify(['Data Analysis', 'Official Statistics']),
+      target_roles: JSON.stringify(['Statistical Officer', 'Senior Statistical Officer', 'Assistant Director', 'Data Processing Assistant']),
+      relevant_departments: JSON.stringify(['Survey Division', 'Survey Division (NSSO)', 'National Accounts Division', 'Price Statistics Division', 'Field Operations Division']),
+      relevant_assignments: JSON.stringify(['Survey Data Analysis', 'PLFS Microdata Validation', 'Microdata Processing', 'Data Cleaning', 'Sampling']),
+      min_recommended_score: 0,
+      difficulty_level: 'Beginner',
+      prerequisites: JSON.stringify(['Basic Computer Literacy']),
+      estimated_duration: '4 weeks (self-paced)',
+      learning_type: 'Course',
+      description: 'Comprehensive practical training on Python, Pandas, and NumPy specifically designed for official statistical personnel working with large-scale survey schedules and administrative datasets.',
+      expected_outcome: 'Ability to automate data cleaning, vectorize complex transformations, and aggregate survey microdata without manual spreadsheet intervention.'
+    },
+    {
+      id: 2,
+      title: 'Data Visualization for Government Officials',
+      source: 'iGOT',
+      competency: 'Data Visualization',
+      secondary_competencies: JSON.stringify(['Reporting & Dissemination', 'Statistics']),
+      target_roles: JSON.stringify(['Statistical Officer', 'Senior Statistical Officer', 'Assistant Director', 'Deputy Director']),
+      relevant_departments: JSON.stringify(['Data Storage & Dissemination Division', 'Survey Division', 'Economic Statistics Division']),
+      relevant_assignments: JSON.stringify(['Statistical Dissemination', 'Report Preparation', 'PLFS Report Release', 'Survey Data Analysis']),
+      min_recommended_score: 20,
+      difficulty_level: 'Beginner',
+      prerequisites: JSON.stringify(['Basic Statistical Foundations']),
+      estimated_duration: '3 weeks (online)',
+      learning_type: 'Course',
+      description: 'Standardized principles of visual statistical communication, government publication chart standards, avoiding truncated axes, and creating high-impact dashboards.',
+      expected_outcome: 'Design publication-ready boxplots, thematic distributions, and zero-baseline comparative charts aligned with MoSPI reporting protocols.'
+    },
+    {
+      id: 3,
+      title: 'Introduction to AI and Machine Learning',
+      source: 'iGOT',
+      competency: 'AI for Statistics',
+      secondary_competencies: JSON.stringify(['Python', 'Data Analysis', 'Predictive Modeling']),
+      target_roles: JSON.stringify(['Assistant Director', 'Deputy Director', 'Senior Statistical Officer', 'Statistical Officer']),
+      relevant_departments: JSON.stringify(['Data Storage & Dissemination Division', 'National Accounts Division', 'Survey Division']),
+      relevant_assignments: JSON.stringify(['Automated Data Imputation', 'Predictive Analytics', 'Big Data', 'Record Linkage']),
+      min_recommended_score: 55,
+      difficulty_level: 'Intermediate',
+      prerequisites: JSON.stringify(['Python for Data Analysis', 'Applied Data Analysis']),
+      estimated_duration: '6 weeks (hybrid)',
+      learning_type: 'Course',
+      description: 'Foundational concepts of machine learning, classification, clustering, and predictive modeling for public administration and national statistical infrastructure.',
+      expected_outcome: 'Evaluate ML algorithms for anomaly detection in economic registers and understand AI safety/ethical guidelines in governance.'
+    },
+    {
+      id: 4,
+      title: 'Statistical Data Management',
+      source: 'iGOT',
+      competency: 'Data Analysis',
+      secondary_competencies: JSON.stringify(['Statistics', 'Data Quality', 'Relational Databases']),
+      target_roles: JSON.stringify(['Statistical Officer', 'Senior Statistical Officer', 'Data Processing Assistant']),
+      relevant_departments: JSON.stringify(['Survey Division', 'Field Operations Division', 'Economic Statistics Division']),
+      relevant_assignments: JSON.stringify(['Survey Data Analysis', 'Database Scrutiny', 'Data Architecture', 'Quality Audits']),
+      min_recommended_score: 30,
+      difficulty_level: 'Intermediate',
+      prerequisites: JSON.stringify(['Official Statistics Foundations']),
+      estimated_duration: '4 weeks (self-paced)',
+      learning_type: 'Course',
+      description: 'Database design principles, relational querying, audit trails, and data governance frameworks for national statistical repositories.',
+      expected_outcome: 'Implement multi-stage data consistency validation rules and manage relational datasets across survey rounds.'
+    },
+    {
+      id: 5,
+      title: 'R Programming for Statistical Analysis',
+      source: 'iGOT',
+      competency: 'Python',
+      secondary_competencies: JSON.stringify(['Statistics', 'Data Analysis', 'Econometrics']),
+      target_roles: JSON.stringify(['Statistical Officer', 'Senior Statistical Officer', 'Assistant Director']),
+      relevant_departments: JSON.stringify(['National Accounts Division', 'Price Statistics Division', 'Survey Division']),
+      relevant_assignments: JSON.stringify(['Time Series Analysis', 'Econometric Modeling', 'Survey Data Analysis', 'GSDP Compilation']),
+      min_recommended_score: 35,
+      difficulty_level: 'Intermediate',
+      prerequisites: JSON.stringify(['Descriptive Statistics', 'Basic Computing Logic']),
+      estimated_duration: '5 weeks (online)',
+      learning_type: 'Course',
+      description: 'Computational statistical workflows in R using Tidyverse, sampling weight adjustments, survey estimation libraries, and reproducible R Markdown reporting.',
+      expected_outcome: 'Build automated estimation scripts applying sample multipliers and calculating complex survey standard errors.'
+    },
+    {
+      id: 6,
+      title: 'Survey Methodology and Sampling',
+      source: 'NSSTA',
+      competency: 'Statistics',
+      secondary_competencies: JSON.stringify(['Methodology & Theory', 'Data Analysis', 'Sampling Design']),
+      target_roles: JSON.stringify(['Statistical Officer', 'Senior Statistical Officer', 'Assistant Director', 'Field Operations Officer']),
+      relevant_departments: JSON.stringify(['Survey Division (NSSO)', 'Survey Division', 'Field Operations Division']),
+      relevant_assignments: JSON.stringify(['Survey Data Analysis', 'Sampling Frame Preparation', 'PLFS Microdata Validation', 'Field Investigation']),
+      min_recommended_score: 20,
+      difficulty_level: 'Intermediate',
+      prerequisites: JSON.stringify(['Probability Theory & Basic Inference']),
+      estimated_duration: '2 weeks residential (NSSTA Greater Noida)',
+      learning_type: 'Training Programme',
+      description: 'Rigorous institutional training on multi-stage stratified sampling designs, circular systematic sampling, sampling variance estimation, and non-sampling error control.',
+      expected_outcome: 'Formulate sampling stratification protocols, determine optimal sample sizes, and evaluate design effects for socio-economic surveys.'
+    },
+    {
+      id: 7,
+      title: 'Official Statistics and Data Quality',
+      source: 'NSSTA',
+      competency: 'Statistics',
+      secondary_competencies: JSON.stringify(['Data Quality', 'Data Analysis', 'UN-FPOS Standards']),
+      target_roles: JSON.stringify(['Statistical Officer', 'Senior Statistical Officer', 'Assistant Director', 'Deputy Director']),
+      relevant_departments: JSON.stringify(['Survey Division', 'Economic Statistics Division', 'National Accounts Division']),
+      relevant_assignments: JSON.stringify(['Microdata Validation', 'Quality Assurance', 'Survey Oversight', 'Quality Audits']),
+      min_recommended_score: 30,
+      difficulty_level: 'Intermediate',
+      prerequisites: JSON.stringify(['NSSTA Induction Training']),
+      estimated_duration: '2 weeks residential',
+      learning_type: 'Training Programme',
+      description: 'National Quality Assurance Framework (NQAF), United Nations Fundamental Principles of Official Statistics, microdata editing, and item-nonresponse imputation.',
+      expected_outcome: 'Design robust field scrutiny checklists and apply statistical imputation standards for survey microdata releases.'
+    },
+    {
+      id: 8,
+      title: 'GIS Applications in Official Statistics',
+      source: 'NSSTA',
+      competency: 'Data Visualization',
+      secondary_competencies: JSON.stringify(['Spatial Analysis', 'Field Operations', 'Thematic Cartography']),
+      target_roles: JSON.stringify(['Statistical Officer', 'Senior Statistical Officer', 'Assistant Director']),
+      relevant_departments: JSON.stringify(['Field Operations Division', 'Survey Division', 'Data Storage & Dissemination Division']),
+      relevant_assignments: JSON.stringify(['GIS / Spatial Data', 'Urban Frame Survey (UFS) Mapping', 'Geospatial Frame Preparation', 'Field Operations']),
+      min_recommended_score: 30,
+      difficulty_level: 'Intermediate',
+      prerequisites: JSON.stringify(['Data Visualization Basics']),
+      estimated_duration: '3 weeks residential',
+      learning_type: 'Training Programme',
+      description: 'Geographic Information Systems (GIS), digital boundary demarcation, QGIS workflows, and geospatial sample frame preparation for national census and surveys.',
+      expected_outcome: 'Construct geo-referenced sampling frames, generate choropleth district maps, and validate spatial boundary polygons.'
+    },
+    {
+      id: 9,
+      title: 'Statistical Computing with R',
+      source: 'NSSTA',
+      competency: 'Python',
+      secondary_competencies: JSON.stringify(['Data Analysis', 'Statistics', 'Simulation']),
+      target_roles: JSON.stringify(['Statistical Officer', 'Senior Statistical Officer', 'Assistant Director']),
+      relevant_departments: JSON.stringify(['National Accounts Division', 'Price Statistics Division', 'Survey Division']),
+      relevant_assignments: JSON.stringify(['Econometric Modeling', 'Survey Data Analysis', 'Index Computation', 'Macroeconomic Estimation']),
+      min_recommended_score: 40,
+      difficulty_level: 'Intermediate',
+      prerequisites: JSON.stringify(['Basic Statistics', 'NSSTA Induction']),
+      estimated_duration: '2 weeks residential',
+      learning_type: 'Training Programme',
+      description: 'Hands-on lab intensive on statistical programming, bootstrapping survey variances, Monte Carlo simulation, and microdata processing pipelines.',
+      expected_outcome: 'Develop automated analysis scripts for national survey microdata releases with verified reproducible standards.'
+    },
+    {
+      id: 10,
+      title: 'AI Applications in Official Statistics',
+      source: 'NSSTA',
+      competency: 'AI for Statistics',
+      secondary_competencies: JSON.stringify(['Python', 'Machine Learning', 'Natural Language Processing']),
+      target_roles: JSON.stringify(['Assistant Director', 'Deputy Director', 'Senior Statistical Officer']),
+      relevant_departments: JSON.stringify(['Data Storage & Dissemination Division', 'National Accounts Division', 'Survey Division']),
+      relevant_assignments: JSON.stringify(['Big Data Analytics', 'Automated Industry Classification (NIC)', 'High-Frequency Indicators']),
+      min_recommended_score: 60,
+      difficulty_level: 'Advanced',
+      prerequisites: JSON.stringify(['Python for Data Analysis', 'Applied Data Analysis', 'Survey Methodology']),
+      estimated_duration: '3 weeks intensive residential',
+      learning_type: 'Training Programme',
+      description: 'Cutting-edge machine learning and NLP for automated industrial code mapping (NIC/NCO), satellite imagery for agricultural estimation, and synthetic data generation.',
+      expected_outcome: 'Deploy machine learning classifiers for trade and survey schedules, evaluating model auditability and algorithmic fairness.'
+    },
+    {
+      id: 11,
+      title: 'Consumer Price Index (CPI) Compilation & Price Statistics',
+      source: 'NSSTA',
+      competency: 'Data Analysis',
+      secondary_competencies: JSON.stringify(['Statistics', 'Price Indexation', 'Index Numbers']),
+      target_roles: JSON.stringify(['Statistical Officer', 'Senior Statistical Officer', 'Assistant Director']),
+      relevant_departments: JSON.stringify(['Price Statistics Division', 'Economic Statistics Division']),
+      relevant_assignments: JSON.stringify(['Price Statistics / CPI', 'Consumer Price Index Scrutiny', 'Inflation Analysis', 'Rural/Urban Price Collection']),
+      min_recommended_score: 25,
+      difficulty_level: 'Intermediate',
+      prerequisites: JSON.stringify(['Index Number Theory']),
+      estimated_duration: '2 weeks residential',
+      learning_type: 'Training Programme',
+      description: 'Laspeyres price indexing, geometric mean aggregation, elementary aggregates, web scraping for price quotes, and hedonic quality adjustments.',
+      expected_outcome: 'Compute monthly headline and core inflation indices, impute missing quotations, and audit price relative consistency.'
+    },
+    {
+      id: 12,
+      title: 'National Accounts & Gross State Domestic Product (GSDP) Framework',
+      source: 'NSSTA',
+      competency: 'Data Analysis',
+      secondary_competencies: JSON.stringify(['Statistics', 'Macroeconomics', 'SNA 2008']),
+      target_roles: JSON.stringify(['Assistant Director', 'Deputy Director', 'Statistical Officer', 'Senior Statistical Officer']),
+      relevant_departments: JSON.stringify(['National Accounts Division', 'Economic Statistics Division']),
+      relevant_assignments: JSON.stringify(['National Accounts / GDP', 'GSDP Compilation & Sectoral Value Added', 'Gross State Domestic Product (GSDP) Compilation', 'Annual Survey of Industries (ASI) Estimation']),
+      min_recommended_score: 30,
+      difficulty_level: 'Intermediate',
+      prerequisites: JSON.stringify(['Macroeconomic Aggregates', 'Induction Program']),
+      estimated_duration: '2 weeks residential',
+      learning_type: 'Training Programme',
+      description: 'System of National Accounts (SNA 2008), gross value added (GVA) estimation across primary/secondary/tertiary sectors, and state income accounts.',
+      expected_outcome: 'Compile sector-wise GSDP estimates, apply deflators, and reconcile corporate financial data with statistical benchmarks.'
+    }
+  ];
+
+  for (const r of resources) {
+    pgInstance.public.none(`
+      INSERT INTO learning_resources
+      (id, title, source, competency, secondary_competencies, target_roles, relevant_departments, relevant_assignments, min_recommended_score, difficulty_level, prerequisites, estimated_duration, learning_type, description, expected_outcome)
+      VALUES
+      (${r.id}, '${r.title.replace(/'/g, "''")}', '${r.source}', '${r.competency.replace(/'/g, "''")}', 
+       '${r.secondary_competencies.replace(/'/g, "''")}', '${r.target_roles.replace(/'/g, "''")}', 
+       '${r.relevant_departments.replace(/'/g, "''")}', '${r.relevant_assignments.replace(/'/g, "''")}', 
+       ${r.min_recommended_score}, '${r.difficulty_level}', '${r.prerequisites.replace(/'/g, "''")}', 
+       '${r.estimated_duration.replace(/'/g, "''")}', '${r.learning_type.replace(/'/g, "''")}', 
+       '${r.description.replace(/'/g, "''")}', '${r.expected_outcome.replace(/'/g, "''")}');
     `);
   }
 }

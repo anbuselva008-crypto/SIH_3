@@ -80,3 +80,45 @@ export interface SkillGapReport {
   priority_areas: SkillGapItem[];
   all_competencies: SkillGapItem[];
 }
+
+export interface LearningResource {
+  id: number;
+  title: string;
+  source: 'iGOT' | 'NSSTA';
+  competency: string;
+  secondary_competencies: string[];
+  target_roles: string[];
+  relevant_departments: string[];
+  relevant_assignments: string[];
+  min_recommended_score: number;
+  difficulty_level: 'Beginner' | 'Intermediate' | 'Advanced';
+  prerequisites: string[];
+  estimated_duration: string;
+  learning_type: 'Course' | 'Training Programme';
+  description: string;
+  expected_outcome: string;
+  created_at?: string;
+}
+
+export interface RecommendationItem {
+  id: number;
+  learner_id: number;
+  learning_resource_id: number;
+  recommendation_score: number;
+  priority: 'HIGH PRIORITY' | 'RECOMMENDED NEXT' | 'OPTIONAL / FUTURE';
+  reason: string;
+  resource: LearningResource;
+  current_competency_score: number;
+  target_competency_score: number;
+  created_at?: string;
+}
+
+export interface RecommendationResponse {
+  learner_id: number;
+  next_step: RecommendationItem | null;
+  high_priority: RecommendationItem[];
+  recommended_next: RecommendationItem[];
+  optional_future: RecommendationItem[];
+  all_recommendations: RecommendationItem[];
+}
+

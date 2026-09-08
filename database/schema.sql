@@ -60,10 +60,43 @@ CREATE TABLE IF NOT EXISTS assessment_attempts (
   completed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 5. Learning Resources Catalogue (Stage 3 - iGOT & NSSTA)
+CREATE TABLE IF NOT EXISTS learning_resources (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(200) NOT NULL,
+  source VARCHAR(50) NOT NULL, -- 'iGOT' | 'NSSTA'
+  competency VARCHAR(100) NOT NULL,
+  secondary_competencies TEXT NOT NULL,
+  target_roles TEXT NOT NULL,
+  relevant_departments TEXT NOT NULL,
+  relevant_assignments TEXT NOT NULL,
+  min_recommended_score INTEGER DEFAULT 0,
+  difficulty_level VARCHAR(50) NOT NULL,
+  prerequisites TEXT NOT NULL,
+  estimated_duration VARCHAR(100) NOT NULL,
+  learning_type VARCHAR(100) NOT NULL, -- 'Course' | 'Training Programme'
+  description TEXT NOT NULL,
+  expected_outcome TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. Personalized Recommendations (Stage 3)
+CREATE TABLE IF NOT EXISTS recommendations (
+  id SERIAL PRIMARY KEY,
+  learner_id INTEGER NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+  learning_resource_id INTEGER NOT NULL REFERENCES learning_resources(id) ON DELETE CASCADE,
+  recommendation_score INTEGER NOT NULL,
+  priority VARCHAR(50) NOT NULL, -- 'HIGH PRIORITY' | 'RECOMMENDED NEXT' | 'OPTIONAL / FUTURE'
+  reason TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Create Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_competencies_learner_id ON competencies(learner_id);
 CREATE INDEX IF NOT EXISTS idx_assessment_questions_comp ON assessment_questions(competency_name);
 CREATE INDEX IF NOT EXISTS idx_assessment_attempts_learner ON assessment_attempts(learner_id);
+CREATE INDEX IF NOT EXISTS idx_recommendations_learner ON recommendations(learner_id);
+CREATE INDEX IF NOT EXISTS idx_learning_resources_competency ON learning_resources(competency);
 
 -- Baseline Seed Data
 INSERT INTO learners (id, name, role, department, email)

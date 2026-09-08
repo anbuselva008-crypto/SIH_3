@@ -108,6 +108,45 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
+export interface LearningResource {
+  id: number;
+  title: string;
+  source: 'iGOT' | 'NSSTA';
+  competency: string;
+  secondary_competencies: string[];
+  target_roles: string[];
+  relevant_departments: string[];
+  relevant_assignments: string[];
+  level: 'Beginner' | 'Intermediate' | 'Advanced';
+  duration: string;
+  prerequisites: string;
+  expected_outcome: string;
+  min_recommended_score: number;
+  description: string;
+}
+
+export interface RecommendationItem {
+  id: number;
+  learner_id: number;
+  learning_resource_id: number;
+  recommendation_score: number;
+  priority: 'HIGH PRIORITY' | 'RECOMMENDED NEXT' | 'OPTIONAL / FUTURE';
+  reason: string;
+  resource: LearningResource;
+  current_competency_score: number;
+  target_competency_score: number;
+  created_at?: string;
+}
+
+export interface RecommendationResponse {
+  learner_id: number;
+  next_step: RecommendationItem | null;
+  high_priority: RecommendationItem[];
+  recommended_next: RecommendationItem[];
+  optional_future: RecommendationItem[];
+  all_recommendations: RecommendationItem[];
+}
+
 export interface HealthResponse {
   status: string;
   stage: string;
@@ -122,4 +161,5 @@ export interface HealthResponse {
   };
   timestamp: string;
 }
+
 
