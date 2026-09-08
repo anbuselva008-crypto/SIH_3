@@ -8,6 +8,7 @@ import type {
   SkillGapItem
 } from '../database/models.ts';
 import { LearnerService } from './learnerService.ts';
+import { DomainPackService } from './domainPackService.ts';
 
 interface RawLearningResource {
   id: number;
@@ -117,6 +118,12 @@ export class RecommendationService {
     const officerEducation = (learner.educational_qualification || '').toLowerCase();
     const officerTraining = (learner.previous_training || '').toLowerCase();
 
+    // Resolve Officer Cadre Role via DomainPackService
+    const resolvedRole = DomainPackService.resolveRole(learner.role_id || learner.role, learner.department);
+    const roleReqCompetencies = new Map(resolvedRole.required_competencies.map(rc => [(rc.name || (rc as any).competency_name || '').toLowerCase(), rc]));
+    const futureSkills = DomainPackService.getFutureSkillsForRole(resolvedRole.id);
+    const typicalAssignments = resolvedRole.typical_assignments.map(a => a.toLowerCase());
+
     const scoredItems: Array<{
       resource: LearningResource;
       score: number;
@@ -137,7 +144,7 @@ export class RecommendationService {
       let score = 0;
       const reasonParts: string[] = [];
 
-      // A. Skill-Gap Match (0 to 45 pts)
+      // A. Skill-Gap & Cadre Competency Match (0 to 45 pts)
       if (compItem) {
         if (compItem.status === 'critical_gap') {
           score += 42;
@@ -149,7 +156,7 @@ export class RecommendationService {
           score += 5;
         }
       } else {
-        // Domain specific topics (e.g. AI, GIS, Price Statistics)
+        // Domain specific topics (e.g. AI, GIS, Cadre topics)
         // Check secondary competencies
         const hasSecondaryGap = res.secondary_competencies.some(sec => {
           const item = compMap.get(sec.toLowerCase());
@@ -160,34 +167,56 @@ export class RecommendationService {
         }
       }
 
+      // Check if competency is a mandatory requirement for this cadre
+      if (roleReqCompetencies.has(resCompName) || res.secondary_competencies.some(s => roleReqCompetencies.has(s.toLowerCase()))) {
+        score += 12;
+        const rc = roleReqCompetencies.get(resCompName);
+        const crit = rc?.criticality ? ` (${rc.criticality})` : '';
+        reasonParts.push(`Mandatory core competency requirement${crit} for the ${resolvedRole.name} cadre`);
+      }
+
       // B. Current Operational Assignment & Department Match (0 to 25 pts)
       let assignmentMatched = false;
       let domainRelevanceBoost = 0;
 
+      // Check against role's typical operational assignments
+      for (const typAssign of typicalAssignments) {
+        if (officerAssignment.includes(typAssign) || typAssign.includes(officerAssignment)) {
+          if (res.relevant_assignments.some(ra => ra.toLowerCase().includes(typAssign) || typAssign.includes(ra.toLowerCase()))) {
+            assignmentMatched = true;
+            domainRelevanceBoost = 25;
+            reasonParts.push(`Directly targets your core operational duties in "${learner.current_assignment || typAssign}"`);
+            break;
+          }
+        }
+      }
+
       // Check explicit assignment keywords
-      if (officerAssignment.includes('cpi') || officerAssignment.includes('price')) {
-        if (titleLower.includes('cpi') || titleLower.includes('price') || titleLower.includes('inflation')) {
-          assignmentMatched = true;
-          domainRelevanceBoost = 25;
-          reasonParts.push(`Directly targets your core duties in Price Statistics and Consumer Price Index compilation`);
-        }
-      } else if (officerAssignment.includes('gis') || officerAssignment.includes('spatial') || officerAssignment.includes('mapping')) {
-        if (titleLower.includes('gis') || titleLower.includes('spatial') || res.competency.toLowerCase().includes('gis')) {
-          assignmentMatched = true;
-          domainRelevanceBoost = 25;
-          reasonParts.push(`Directly targets your core duties in GIS and spatial sample frame preparation`);
-        }
-      } else if (officerAssignment.includes('survey') || officerAssignment.includes('plfs') || officerAssignment.includes('microdata') || officerAssignment.includes('sampling')) {
-        if (titleLower.includes('survey') || titleLower.includes('sampling') || titleLower.includes('python for data analysis') || titleLower.includes('data management')) {
-          assignmentMatched = true;
-          domainRelevanceBoost = 25;
-          reasonParts.push(`Directly supports your operational assignment in "${learner.current_assignment || 'Survey Data Analysis'}"`);
-        }
-      } else if (officerAssignment.includes('national accounts') || officerAssignment.includes('gdp') || officerAssignment.includes('gsdp')) {
-        if (titleLower.includes('national accounts') || titleLower.includes('gsdp') || titleLower.includes('gva')) {
-          assignmentMatched = true;
-          domainRelevanceBoost = 25;
-          reasonParts.push(`Directly supports your assignment in National Accounts and State Domestic Product estimation`);
+      if (!assignmentMatched) {
+        if (officerAssignment.includes('cpi') || officerAssignment.includes('price')) {
+          if (titleLower.includes('cpi') || titleLower.includes('price') || titleLower.includes('inflation')) {
+            assignmentMatched = true;
+            domainRelevanceBoost = 25;
+            reasonParts.push(`Directly targets your core duties in Price Statistics and Consumer Price Index compilation`);
+          }
+        } else if (officerAssignment.includes('gis') || officerAssignment.includes('spatial') || officerAssignment.includes('mapping')) {
+          if (titleLower.includes('gis') || titleLower.includes('spatial') || res.competency.toLowerCase().includes('gis')) {
+            assignmentMatched = true;
+            domainRelevanceBoost = 25;
+            reasonParts.push(`Directly targets your core duties in GIS and spatial sample frame preparation`);
+          }
+        } else if (officerAssignment.includes('survey') || officerAssignment.includes('plfs') || officerAssignment.includes('microdata') || officerAssignment.includes('sampling')) {
+          if (titleLower.includes('survey') || titleLower.includes('sampling') || titleLower.includes('python for data analysis') || titleLower.includes('data management')) {
+            assignmentMatched = true;
+            domainRelevanceBoost = 25;
+            reasonParts.push(`Directly supports your operational assignment in "${learner.current_assignment || 'Survey Data Analysis'}"`);
+          }
+        } else if (officerAssignment.includes('national accounts') || officerAssignment.includes('gdp') || officerAssignment.includes('gsdp')) {
+          if (titleLower.includes('national accounts') || titleLower.includes('gsdp') || titleLower.includes('gva')) {
+            assignmentMatched = true;
+            domainRelevanceBoost = 25;
+            reasonParts.push(`Directly supports your assignment in National Accounts and State Domestic Product estimation`);
+          }
         }
       }
 
@@ -220,11 +249,29 @@ export class RecommendationService {
       }
 
       // C. Target Role Match (0 to 15 pts)
-      const roleMatched = res.target_roles.some(tr => officerRole.includes(tr.toLowerCase()) || tr.toLowerCase().includes(officerRole));
+      const roleMatched = res.target_roles.some(tr => {
+        const trLower = tr.toLowerCase();
+        return trLower.includes(resolvedRole.id) ||
+               resolvedRole.name.toLowerCase().includes(trLower) ||
+               trLower.includes(resolvedRole.name.toLowerCase()) ||
+               officerRole.includes(trLower) ||
+               trLower.includes(officerRole);
+      });
       if (roleMatched) {
-        score += 14;
+        score += 15;
       } else {
         score += 4;
+      }
+
+      // D. Future Skills Alignment Boost (0 to 15 pts)
+      const matchedFutureSkill = futureSkills.find(fs => {
+        const sName = (fs.name || (fs as any).skill_name || '').toLowerCase();
+        return Boolean(sName && (titleLower.includes(sName) || resCompName.includes(sName)));
+      });
+      if (matchedFutureSkill) {
+        score += 15;
+        const sName = matchedFutureSkill.name || (matchedFutureSkill as any).skill_name;
+        reasonParts.push(`Cultivates high-impact Future Skill in "${sName}" for modern governance`);
       }
 
       // D. Educational Background Relevance (0 to 10 pts)

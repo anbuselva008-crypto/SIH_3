@@ -345,17 +345,20 @@ function RecommendationCard({
       </div>
 
       {/* Action CTA */}
-      <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+      <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2">
         <div className="text-xs text-slate-500">
           Match: <strong className="text-slate-900">{item.recommendation_score}%</strong>
         </div>
-        <button
-          onClick={onViewDetails}
-          className="text-xs font-bold text-blue-700 hover:text-blue-900 flex items-center gap-1 cursor-pointer transition-colors"
-        >
-          <span>View Details</span>
-          <ChevronRight className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onViewDetails}
+            className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50/70 hover:bg-blue-100/70 px-2.5 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span>Practice with AI Quiz</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -409,12 +412,16 @@ function CatalogueCard({
         </div>
       </div>
 
-      <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-end">
+      <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+        <span className="text-[11px] text-slate-500 flex items-center gap-1">
+          <Sparkles className="w-3 h-3 text-amber-500" />
+          AI Quiz Available
+        </span>
         <button
           onClick={onView}
-          className="text-xs font-bold text-indigo-700 hover:text-indigo-900 flex items-center gap-1 cursor-pointer transition-colors"
+          className="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50/70 hover:bg-indigo-100/70 px-2.5 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
         >
-          <span>Course Details</span>
+          <span>Course Details & Quiz</span>
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>

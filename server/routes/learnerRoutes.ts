@@ -1,9 +1,27 @@
 import { Router, type Request, type Response } from 'express';
+import multer from 'multer';
 import { LearnerService } from '../services/learnerService.ts';
 import { RecommendationService } from '../services/recommendationService.ts';
+import { DocumentService } from '../services/documentService.ts';
+import { QuizService } from '../services/quizService.ts';
+import { DomainPackService } from '../services/domainPackService.ts';
 import { getDbStatus } from '../database/db.ts';
 
 const router = Router();
+
+// Configure safe in-memory file upload middleware for learning materials
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
+  fileFilter: (_req, file, cb) => {
+    const ext = file.originalname.split('.').pop()?.toLowerCase() || '';
+    if (['pdf', 'pptx', 'docx', 'txt'].includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid file format (.${ext}). Only PDF, PPTX, DOCX, and TXT are supported.`));
+    }
+  },
+});
 
 /**
  * POST /api/auth/login
@@ -99,7 +117,10 @@ router.post('/profile/setup', async (req: Request, res: Response) => {
       current_assignment, 
       educational_qualification, 
       years_of_experience, 
-      previous_training 
+      previous_training,
+      job_family_id,
+      role_id,
+      language_preference
     } = req.body;
 
     if (!learner_id) {
@@ -117,6 +138,9 @@ router.post('/profile/setup', async (req: Request, res: Response) => {
       educational_qualification,
       years_of_experience: Number(years_of_experience),
       previous_training,
+      job_family_id,
+      role_id,
+      language_preference,
     });
 
     // Automatically initialize personalized recommendations based on profile
@@ -200,7 +224,8 @@ router.get('/competencies', async (req: Request, res: Response) => {
 router.get('/assessment/questions', async (req: Request, res: Response) => {
   try {
     const competency = req.query.competency as string | undefined;
-    const questions = await LearnerService.getAssessmentQuestions(competency);
+    const roleId = (req.query.role_id || req.query.role) as string | undefined;
+    const questions = await LearnerService.getAssessmentQuestions(competency, roleId);
 
     return res.json({
       success: true,
@@ -408,6 +433,361 @@ router.get('/recommendations/:id', async (req: Request, res: Response) => {
   }
 });
 
+// ==========================================
+// STAGE 4 — Learning Materials & AI Quiz Endpoints
+// ==========================================
+
+/**
+ * POST /api/learning-materials/upload
+ * Securely uploads and extracts learning documents (PDF, PPTX, DOCX, TXT).
+ */
+router.post('/learning-materials/upload', upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file was uploaded. Please provide a valid PDF, PPTX, DOCX, or TXT file.',
+      });
+    }
+
+    const learnerId = req.body.learner_id ? parseInt(req.body.learner_id, 10) : undefined;
+    const learningResourceId = req.body.learning_resource_id ? parseInt(req.body.learning_resource_id, 10) : undefined;
+
+    const result = await DocumentService.processUploadedDocument(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      learnerId,
+      learningResourceId
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: `Document "${file.originalname}" successfully processed (${result.chunks.length} sections indexed).`,
+      data: {
+        material: result.material,
+        page_or_section_count: result.parsedDoc.pageOrSectionCount,
+        file_type: result.parsedDoc.fileType,
+        chunk_count: result.chunks.length,
+      },
+    });
+  } catch (error) {
+    console.error('Error uploading learning document:', error);
+    return res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to process uploaded learning document.',
+    });
+  }
+});
+
+/**
+ * GET /api/learning-materials/:id
+ * Retrieves metadata for a specific learning material.
+ */
+router.get('/learning-materials/:id', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const material = await DocumentService.getMaterialById(id);
+    if (!material) {
+      return res.status(404).json({
+        success: false,
+        error: 'Learning material not found.',
+      });
+    }
+    return res.json({
+      success: true,
+      data: material,
+    });
+  } catch (error) {
+    console.error('Error fetching learning material:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve learning material.',
+    });
+  }
+});
+
+/**
+ * GET /api/learning-materials/resource/:resourceId
+ * Retrieves linked learning material for a Stage 3 learning resource.
+ */
+router.get('/learning-materials/resource/:resourceId', async (req: Request, res: Response) => {
+  try {
+    const resourceId = parseInt(req.params.resourceId, 10);
+    const material = await DocumentService.getMaterialForResource(resourceId);
+    if (!material) {
+      return res.status(404).json({
+        success: false,
+        error: 'No learning material linked to this resource yet.',
+      });
+    }
+    return res.json({
+      success: true,
+      data: material,
+    });
+  } catch (error) {
+    console.error('Error fetching material for resource:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve material for resource.',
+    });
+  }
+});
+
+/**
+ * POST /api/learning-materials/:id/generate-quiz
+ * Generates grounded AI practice quiz from a learning material.
+ */
+router.post('/learning-materials/:id/generate-quiz', async (req: Request, res: Response) => {
+  try {
+    const materialId = parseInt(req.params.id, 10);
+    const rawCount = req.body.question_count;
+    const questionCount = rawCount === 5 || rawCount === 15 ? rawCount : 10;
+    const learnerId = req.body.learner_id ? parseInt(req.body.learner_id, 10) : undefined;
+
+    const quiz = await QuizService.generateAndSaveQuiz(materialId, {
+      questionCount,
+      learnerId,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `AI Practice Quiz generated (${quiz.questions?.length} questions). Grounded strictly in official learning material.`,
+      data: quiz,
+    });
+  } catch (error) {
+    console.error('Error generating AI quiz from material:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "We couldn't generate the quiz right now. Please try again in a moment.",
+    });
+  }
+});
+
+/**
+ * POST /api/learning-resources/:id/generate-quiz
+ * Generates an AI practice quiz directly from a recommended learning resource.
+ */
+router.post('/learning-resources/:id/generate-quiz', async (req: Request, res: Response) => {
+  try {
+    const resourceId = parseInt(req.params.id, 10);
+    const rawCount = req.body.question_count;
+    const questionCount = rawCount === 5 || rawCount === 15 ? rawCount : 10;
+    const learnerId = req.body.learner_id ? parseInt(req.body.learner_id, 10) : 1;
+
+    // Locate linked material or create default
+    let material = await DocumentService.getMaterialForResource(resourceId);
+    if (!material) {
+      // Create on-demand demo material
+      const resData = await RecommendationService.getLearningResourceById(resourceId);
+      if (!resData) {
+        return res.status(404).json({
+          success: false,
+          error: 'Learning resource not found in catalogue.',
+        });
+      }
+      const dummyBuffer = Buffer.from(
+        `Official Course Notes: ${resData.title}\n\n[Section 1: Core Principles]\n${resData.description}\n\n[Section 2: Expected Outcome]\n${resData.expected_outcome}`
+      );
+      const created = await DocumentService.processUploadedDocument(
+        dummyBuffer,
+        `${resData.title.replace(/[^a-zA-Z0-9]/g, '_')}_Notes.txt`,
+        'text/plain',
+        learnerId,
+        resourceId
+      );
+      material = created.material;
+    }
+
+    const quiz = await QuizService.generateAndSaveQuiz(material.id, {
+      questionCount,
+      learnerId,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `AI Practice Quiz created for "${quiz.title}".`,
+      data: quiz,
+    });
+  } catch (error) {
+    console.error('Error generating quiz for learning resource:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "We couldn't generate the quiz right now. Please try again in a moment.",
+    });
+  }
+});
+
+/**
+ * GET /api/quizzes/:id
+ * Retrieves full quiz including questions, explanations, and source references.
+ */
+router.get('/quizzes/:id', async (req: Request, res: Response) => {
+  try {
+    const quizId = parseInt(req.params.id, 10);
+    const quiz = await QuizService.getQuizById(quizId);
+    return res.json({
+      success: true,
+      data: quiz,
+    });
+  } catch (error) {
+    console.error('Error fetching quiz:', error);
+    return res.status(404).json({
+      success: false,
+      error: 'Quiz not found.',
+    });
+  }
+});
+
+/**
+ * GET /api/quizzes/:id/questions
+ * Retrieves questions for an active quiz session.
+ */
+router.get('/quizzes/:id/questions', async (req: Request, res: Response) => {
+  try {
+    const quizId = parseInt(req.params.id, 10);
+    const quiz = await QuizService.getQuizById(quizId);
+    // Return sanitized questions without revealing correct answer during exam
+    const activeQuestions = quiz.questions?.map((q) => ({
+      id: q.id,
+      quiz_id: q.quiz_id,
+      question_text: q.question_text,
+      options: q.options,
+      competency: q.competency,
+      difficulty: q.difficulty,
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        quiz_id: quiz.id,
+        title: quiz.title,
+        competency_name: quiz.competency_name,
+        question_count: quiz.question_count,
+        questions: activeQuestions,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching active quiz questions:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to load quiz questions.',
+    });
+  }
+});
+
+/**
+ * POST /api/quizzes/:id/attempt
+ * Submits quiz answers, evaluates score, records evidence (without destroying baseline).
+ */
+router.post('/quizzes/:id/attempt', async (req: Request, res: Response) => {
+  try {
+    const quizId = parseInt(req.params.id, 10);
+    const learnerId = req.body.learner_id ? parseInt(req.body.learner_id, 10) : 1;
+    const answers = req.body.answers || {};
+
+    const result = await QuizService.submitQuizAttempt({
+      quiz_id: quizId,
+      learner_id: learnerId,
+      answers,
+    });
+
+    return res.json({
+      success: true,
+      message: result.message,
+      data: {
+        attempt: result.attempt,
+        answers: result.answers,
+      },
+    });
+  } catch (error) {
+    console.error('Error submitting quiz attempt:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to evaluate quiz attempt.',
+    });
+  }
+});
+
+/**
+ * GET /api/quizzes/:id/result/:attemptId
+ * Retrieves detailed result for a quiz attempt.
+ */
+router.get('/quizzes/:id/result/:attemptId', async (req: Request, res: Response) => {
+  try {
+    const attemptId = parseInt(req.params.attemptId, 10);
+    const result = await QuizService.getAttemptResult(attemptId);
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Quiz attempt record not found.',
+      });
+    }
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error fetching quiz attempt result:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch quiz result.',
+    });
+  }
+});
+
+/**
+ * GET /api/quizzes/learner/:learnerId
+ * Retrieves past quizzes taken by learner.
+ */
+router.get('/quizzes/learner/:learnerId', async (req: Request, res: Response) => {
+  try {
+    const learnerId = parseInt(req.params.learnerId, 10);
+    const quizzes = await QuizService.getLearnerQuizzes(learnerId);
+    return res.json({
+      success: true,
+      count: quizzes.length,
+      data: quizzes,
+    });
+  } catch (error) {
+    console.error('Error fetching learner quizzes:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch learner quizzes.',
+    });
+  }
+});
+
+/**
+ * PATCH /api/quizzes/:id/review
+ * Administrator review audit endpoint (approved | needs_review | rejected).
+ */
+router.patch('/quizzes/:id/review', async (req: Request, res: Response) => {
+  try {
+    const quizId = parseInt(req.params.id, 10);
+    const status = req.body.status;
+    if (!['approved', 'needs_review', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid review status. Must be "approved", "needs_review", or "rejected".',
+      });
+    }
+    const updated = await QuizService.updateReviewStatus(quizId, status);
+    return res.json({
+      success: true,
+      message: `Quiz #${quizId} review status updated to ${status}.`,
+      data: updated,
+    });
+  } catch (error) {
+    console.error('Error updating quiz review status:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to update review status.',
+    });
+  }
+});
+
 /**
  * GET /api/health
  * Verifies backend and database connectivity.
@@ -417,9 +797,11 @@ router.get('/health', (req: Request, res: Response) => {
     const dbStatus = getDbStatus();
     return res.json({
       status: 'healthy',
-      stage: 'Stage 3 - Personalized Learning Recommendation Engine',
+      stage: 'Stage 4 - Groq-Powered Learning Material Intelligence & AI Quiz Generation',
       project: 'AI-Enabled Personalized Learning & Competency Gap Platform for India Official Statistical System',
       database: dbStatus,
+      groq_configured: Boolean(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim().length > 0),
+      groq_model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -427,6 +809,100 @@ router.get('/health', (req: Request, res: Response) => {
       status: 'unhealthy',
       error: String(error),
     });
+  }
+});
+
+/**
+ * GET /api/domain/job-families
+ * Returns all government job families in the Universal Government Framework.
+ */
+router.get('/domain/job-families', (_req: Request, res: Response) => {
+  try {
+    const families = DomainPackService.getAllJobFamilies();
+    return res.json({
+      success: true,
+      data: families,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Failed to retrieve job families' });
+  }
+});
+
+/**
+ * GET /api/domain/job-families/:id/roles
+ * Returns all standard cadre roles belonging to a specific job family.
+ */
+router.get('/domain/job-families/:id/roles', (req: Request, res: Response) => {
+  try {
+    const roles = DomainPackService.getRolesByJobFamily(req.params.id);
+    return res.json({
+      success: true,
+      data: roles,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Failed to retrieve family roles' });
+  }
+});
+
+/**
+ * GET /api/domain/roles
+ * Returns all roles across all job families.
+ */
+router.get('/domain/roles', (_req: Request, res: Response) => {
+  try {
+    const roles = DomainPackService.getAllRoles();
+    return res.json({
+      success: true,
+      data: roles,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Failed to retrieve roles' });
+  }
+});
+
+/**
+ * GET /api/domain/role-profile
+ * Resolves a role definition, required competencies, typical assignments, and future skills.
+ */
+router.get('/domain/role-profile', (req: Request, res: Response) => {
+  try {
+    const roleIdentifier = (req.query.role_id || req.query.role) as string;
+    const department = req.query.department as string | undefined;
+    if (!roleIdentifier) {
+      return res.status(400).json({ success: false, error: 'role_id or role query parameter is required' });
+    }
+    const role = DomainPackService.resolveRole(roleIdentifier, department);
+    const futureSkills = DomainPackService.getFutureSkillsForRole(role.id);
+    const jobFamily = DomainPackService.getJobFamilyById(role.job_family_id);
+
+    return res.json({
+      success: true,
+      data: {
+        role,
+        jobFamily,
+        futureSkills,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Failed to resolve role profile' });
+  }
+});
+
+/**
+ * GET /api/domain/future-skills
+ * Returns strategic future skills for an officer's cadre role or all future skills.
+ */
+router.get('/domain/future-skills', (req: Request, res: Response) => {
+  try {
+    const roleId = req.query.role_id as string | undefined;
+    if (roleId) {
+      const skills = DomainPackService.getFutureSkillsForRole(roleId);
+      return res.json({ success: true, data: skills });
+    }
+    const allSkills = DomainPackService.getAllFutureSkills();
+    return res.json({ success: true, data: allSkills });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Failed to retrieve future skills' });
   }
 });
 

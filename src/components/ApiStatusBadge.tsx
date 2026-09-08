@@ -59,6 +59,8 @@ export default function ApiStatusBadge() {
               <>
                 <span>•</span>
                 <span>Records: {health.database.learners_count} Learner, {health.database.competencies_count} Competencies</span>
+                <span>•</span>
+                <span>Stage 4: <code className="text-amber-300">/api/learning-materials</code> & <code className="text-amber-300">/api/quizzes</code></span>
               </>
             )}
           </div>
@@ -66,8 +68,8 @@ export default function ApiStatusBadge() {
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="px-2 py-1 rounded bg-slate-800 text-slate-300 font-mono text-[11px]">
-          Stage 1 Foundation Verified
+        <span className="px-2 py-1 rounded bg-slate-800 text-indigo-300 font-mono text-[11px] border border-indigo-800/40">
+          Stage 1 - 4 Pipeline Verified
         </span>
         <button
           id="refresh-health-btn"

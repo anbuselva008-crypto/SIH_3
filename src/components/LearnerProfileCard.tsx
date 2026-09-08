@@ -1,4 +1,5 @@
-import { User, Briefcase, Building, Award, CheckCircle2, TrendingUp, GraduationCap, Calendar, FileText, Sparkles } from 'lucide-react';
+import { User, Briefcase, Building, Award, CheckCircle2, TrendingUp, GraduationCap, Calendar, FileText, Sparkles, Layers, Globe } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext.tsx';
 import type { LearnerProfile } from '../types/index.ts';
 
 interface LearnerProfileCardProps {
@@ -6,6 +7,8 @@ interface LearnerProfileCardProps {
 }
 
 export default function LearnerProfileCard({ learner }: LearnerProfileCardProps) {
+  const { t, supportedLanguages } = useLanguage();
+
   // Determine score color and tier
   const getScoreColor = (score: number) => {
     if (score >= 75) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
@@ -13,15 +16,17 @@ export default function LearnerProfileCard({ learner }: LearnerProfileCardProps)
     return 'text-rose-700 bg-rose-50 border-rose-200';
   };
 
+  const currentLangObj = supportedLanguages.find(l => l.code === learner.language_preference);
+
   return (
     <div
       id="learner-profile-card"
-      className="bg-white rounded-lg border border-slate-200 shadow-sm p-6 mb-6"
+      className="bg-white rounded-lg border border-slate-200 shadow-xs p-6 mb-6"
     >
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
         {/* Learner Identity Details */}
         <div className="flex items-start gap-4">
-          <div className="w-14 h-14 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 flex-shrink-0">
+          <div className="w-14 h-14 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 shrink-0">
             <User className="w-7 h-7" />
           </div>
 
@@ -34,7 +39,7 @@ export default function LearnerProfileCard({ learner }: LearnerProfileCardProps)
               {learner.is_demo ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-300">
                   <Sparkles className="w-3 h-3 text-amber-600" />
-                  Synthetic / Demo Profile (Arun Kumar)
+                  {t('demo_account')} (Arun Kumar)
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-300">
@@ -43,9 +48,17 @@ export default function LearnerProfileCard({ learner }: LearnerProfileCardProps)
                 </span>
               )}
 
-              {learner.profile_completed && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                  Profile Completed
+              {learner.job_family_id && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <Layers className="w-3 h-3 text-indigo-500" />
+                  {learner.job_family_id.replace('_', ' ').toUpperCase()}
+                </span>
+              )}
+
+              {currentLangObj && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                  <Globe className="w-3 h-3 text-slate-500" />
+                  {currentLangObj.nativeName}
                 </span>
               )}
             </div>
@@ -53,14 +66,14 @@ export default function LearnerProfileCard({ learner }: LearnerProfileCardProps)
             <div className="mt-2 flex flex-wrap items-center gap-y-1 gap-x-4 text-sm text-slate-600">
               <div className="flex items-center gap-1.5" id="learner-role">
                 <Briefcase className="w-4 h-4 text-slate-400" />
-                <span className="font-semibold text-slate-700">Role:</span> {learner.role}
+                <span className="font-semibold text-slate-700">{t('designation_role')}:</span> {learner.role}
               </div>
 
               <span className="text-slate-300 hidden sm:inline">•</span>
 
               <div className="flex items-center gap-1.5" id="learner-department">
                 <Building className="w-4 h-4 text-slate-400" />
-                <span className="font-semibold text-slate-700">Department:</span> {learner.department}
+                <span className="font-semibold text-slate-700">{t('department_ministry')}:</span> {learner.department}
               </div>
 
               {learner.email && (
@@ -77,7 +90,7 @@ export default function LearnerProfileCard({ learner }: LearnerProfileCardProps)
         <div className="flex items-center gap-4 bg-slate-50 border border-slate-200 p-4 rounded-lg">
           <div className="text-right">
             <div className="text-xs uppercase tracking-wider font-semibold text-slate-500">
-              Overall Competency
+              {t('overall_competency_score')}
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
               Aggregate of {learner.competency_count} Competencies
@@ -101,7 +114,7 @@ export default function LearnerProfileCard({ learner }: LearnerProfileCardProps)
         <div className="p-2.5 rounded bg-slate-50/80 border border-slate-200/70">
           <div className="flex items-center gap-1.5 text-slate-500 font-semibold mb-1">
             <FileText className="w-3.5 h-3.5 text-slate-400" />
-            Current Assignment
+            {t('operational_assignment')}
           </div>
           <p className="text-slate-800 font-medium line-clamp-2">
             {learner.current_assignment || 'Periodic Labour Force Survey (PLFS) Microdata Validation'}
@@ -111,7 +124,7 @@ export default function LearnerProfileCard({ learner }: LearnerProfileCardProps)
         <div className="p-2.5 rounded bg-slate-50/80 border border-slate-200/70">
           <div className="flex items-center gap-1.5 text-slate-500 font-semibold mb-1">
             <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
-            Qualification
+            {t('educational_qualification')}
           </div>
           <p className="text-slate-800 font-medium">
             {learner.educational_qualification || 'M.Sc. Statistics'}
@@ -121,7 +134,7 @@ export default function LearnerProfileCard({ learner }: LearnerProfileCardProps)
         <div className="p-2.5 rounded bg-slate-50/80 border border-slate-200/70">
           <div className="flex items-center gap-1.5 text-slate-500 font-semibold mb-1">
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            Service Experience
+            {t('years_of_experience')}
           </div>
           <p className="text-slate-800 font-medium">
             {learner.years_of_experience !== undefined ? `${learner.years_of_experience} Years in Cadre` : '4 Years in Cadre'}
@@ -131,7 +144,7 @@ export default function LearnerProfileCard({ learner }: LearnerProfileCardProps)
         <div className="p-2.5 rounded bg-slate-50/80 border border-slate-200/70">
           <div className="flex items-center gap-1.5 text-slate-500 font-semibold mb-1">
             <Award className="w-3.5 h-3.5 text-slate-400" />
-            Previous Training
+            {t('previous_training')}
           </div>
           <p className="text-slate-800 font-medium line-clamp-2">
             {learner.previous_training || 'NSSTA Induction Program on Official Statistics'}

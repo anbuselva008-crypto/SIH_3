@@ -9,7 +9,14 @@ import type {
   RecommendationItem,
   RecommendationResponse,
   ApiResponse, 
-  HealthResponse 
+  HealthResponse,
+  LearningMaterial,
+  Quiz,
+  QuizAttempt,
+  QuizAnswerDetail,
+  JobFamily,
+  RoleDefinition,
+  FutureSkill
 } from '../types/index.ts';
 
 const BASE_URL = '/api';
@@ -123,10 +130,14 @@ export async function getCompetencies(learnerId: number): Promise<CompetencyItem
 }
 
 /**
- * Fetches diagnostic assessment questions
+ * Fetches diagnostic assessment questions, optionally filtered by competency or cadre role
  */
-export async function getAssessmentQuestions(competency?: string): Promise<AssessmentQuestion[]> {
-  const url = competency ? `${BASE_URL}/assessment/questions?competency=${encodeURIComponent(competency)}` : `${BASE_URL}/assessment/questions`;
+export async function getAssessmentQuestions(competency?: string, roleId?: string): Promise<AssessmentQuestion[]> {
+  const params = new URLSearchParams();
+  if (competency) params.append('competency', competency);
+  if (roleId) params.append('role_id', roleId);
+  const queryStr = params.toString();
+  const url = queryStr ? `${BASE_URL}/assessment/questions?${queryStr}` : `${BASE_URL}/assessment/questions`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to fetch assessment questions (HTTP ${response.status})`);
@@ -252,5 +263,217 @@ export async function checkHealth(): Promise<HealthResponse> {
     throw new Error(`Health check failed (HTTP ${response.status})`);
   }
   return await response.json();
+}
+
+// ==========================================
+// STAGE 4 — Learning Materials & AI Quiz API
+// ==========================================
+
+/**
+ * Uploads an official learning material (PDF, PPTX, DOCX, TXT)
+ */
+export async function uploadLearningMaterial(
+  file: File,
+  learnerId?: number,
+  resourceId?: number
+): Promise<{ material: LearningMaterial; chunk_count: number }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (learnerId) formData.append('learner_id', String(learnerId));
+  if (resourceId) formData.append('learning_resource_id', String(resourceId));
+
+  const response = await fetch(`${BASE_URL}/learning-materials/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  const result: ApiResponse<{ material: LearningMaterial; chunk_count: number }> = await response.json();
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || 'Failed to upload and parse learning material');
+  }
+  return result.data;
+}
+
+/**
+ * Fetches linked learning material for a specific resource
+ */
+export async function getLearningMaterialForResource(resourceId: number): Promise<LearningMaterial | null> {
+  const response = await fetch(`${BASE_URL}/learning-materials/resource/${resourceId}`);
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to fetch material for resource (HTTP ${response.status})`);
+  }
+  const result: ApiResponse<LearningMaterial> = await response.json();
+  return result.data;
+}
+
+/**
+ * Generates an AI practice quiz from a learning material
+ */
+export async function generateQuizFromMaterial(
+  materialId: number,
+  questionCount: number = 10,
+  learnerId?: number
+): Promise<Quiz> {
+  const response = await fetch(`${BASE_URL}/learning-materials/${materialId}/generate-quiz`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question_count: questionCount, learner_id: learnerId }),
+  });
+
+  const result: ApiResponse<Quiz> = await response.json();
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || 'Failed to generate quiz from learning material');
+  }
+  return result.data;
+}
+
+/**
+ * Generates an AI practice quiz directly from a recommended learning resource
+ */
+export async function generateQuizFromResource(
+  resourceId: number,
+  questionCount: number = 10,
+  learnerId?: number
+): Promise<Quiz> {
+  const response = await fetch(`${BASE_URL}/learning-resources/${resourceId}/generate-quiz`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question_count: questionCount, learner_id: learnerId }),
+  });
+
+  const result: ApiResponse<Quiz> = await response.json();
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || 'Failed to generate AI quiz for course');
+  }
+  return result.data;
+}
+
+/**
+ * Fetches full quiz details
+ */
+export async function getQuiz(quizId: number): Promise<Quiz> {
+  const response = await fetch(`${BASE_URL}/quizzes/${quizId}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch quiz (HTTP ${response.status})`);
+  }
+  const result: ApiResponse<Quiz> = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to fetch quiz');
+  }
+  return result.data;
+}
+
+/**
+ * Submits quiz attempt answers
+ */
+export async function submitQuizAttempt(
+  quizId: number,
+  learnerId: number,
+  answers: Record<number, number>
+): Promise<{ attempt: QuizAttempt; answers: QuizAnswerDetail[]; message: string }> {
+  const response = await fetch(`${BASE_URL}/quizzes/${quizId}/attempt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ learner_id: learnerId, answers }),
+  });
+
+  const result: ApiResponse<{ attempt: QuizAttempt; answers: QuizAnswerDetail[] }> = await response.json();
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || 'Failed to submit quiz attempt');
+  }
+  return {
+    attempt: result.data.attempt,
+    answers: result.data.answers,
+    message: result.message || 'Quiz attempt evaluated successfully',
+  };
+}
+
+/**
+ * Fetches historical quizzes for a learner
+ */
+export async function getLearnerQuizzes(learnerId: number): Promise<Quiz[]> {
+  const response = await fetch(`${BASE_URL}/quizzes/learner/${learnerId}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch learner quizzes (HTTP ${response.status})`);
+  }
+  const result: ApiResponse<Quiz[]> = await response.json();
+  return result.data || [];
+}
+
+/**
+ * Updates quiz review status (Admin audit)
+ */
+export async function updateQuizReview(
+  quizId: number,
+  status: 'approved' | 'needs_review' | 'rejected'
+): Promise<Quiz> {
+  const response = await fetch(`${BASE_URL}/quizzes/${quizId}/review`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  const result: ApiResponse<Quiz> = await response.json();
+  if (!response.ok || !result.success) {
+    throw new Error(result.error || 'Failed to update review status');
+  }
+  return result.data;
+}
+
+/**
+ * Fetches all government job families from the Universal Government Framework
+ */
+export async function fetchJobFamilies(): Promise<JobFamily[]> {
+  const response = await fetch(`${BASE_URL}/domain/job-families`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch job families (HTTP ${response.status})`);
+  }
+  const result: ApiResponse<JobFamily[]> = await response.json();
+  return result.data || [];
+}
+
+/**
+ * Fetches standard roles for a specified job family
+ */
+export async function fetchRolesByJobFamily(familyId: string): Promise<RoleDefinition[]> {
+  const response = await fetch(`${BASE_URL}/domain/job-families/${familyId}/roles`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch roles for family ${familyId} (HTTP ${response.status})`);
+  }
+  const result: ApiResponse<RoleDefinition[]> = await response.json();
+  return result.data || [];
+}
+
+/**
+ * Resolves a full role profile including required competencies, typical assignments, and future skills
+ */
+export async function fetchRoleProfile(
+  roleId: string, 
+  department?: string
+): Promise<{ role: RoleDefinition; jobFamily?: JobFamily; futureSkills: FutureSkill[] }> {
+  const params = new URLSearchParams();
+  params.append('role_id', roleId);
+  if (department) params.append('department', department);
+  const response = await fetch(`${BASE_URL}/domain/role-profile?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(`Failed to resolve role profile (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Fetches future skills, optionally filtered by role
+ */
+export async function fetchFutureSkills(roleId?: string): Promise<FutureSkill[]> {
+  const url = roleId ? `${BASE_URL}/domain/future-skills?role_id=${roleId}` : `${BASE_URL}/domain/future-skills`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch future skills (HTTP ${response.status})`);
+  }
+  const result: ApiResponse<FutureSkill[]> = await response.json();
+  return result.data || [];
 }
 

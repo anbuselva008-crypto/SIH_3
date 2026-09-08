@@ -12,6 +12,8 @@ import {
   Loader2
 } from 'lucide-react';
 import { loginOfficer, registerOfficer, loginDemoAccount } from '../services/api.ts';
+import { useLanguage } from '../i18n/LanguageContext.tsx';
+import { LanguageSelector } from './LanguageSelector.tsx';
 import type { LearnerProfile } from '../types/index.ts';
 
 interface LoginViewProps {
@@ -19,6 +21,7 @@ interface LoginViewProps {
 }
 
 export default function LoginView({ onLoginSuccess }: LoginViewProps) {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -102,15 +105,16 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
             </div>
             <div>
               <div className="text-xs font-semibold tracking-wider uppercase text-slate-500">
-                Government of India • Ministry of Statistics and Programme Implementation
+                {t('govt_india')} • {t('mospi_nssta')}
               </div>
               <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
                 National Statistical Systems Training Academy (NSSTA)
               </h1>
             </div>
           </div>
-          <div className="hidden md:flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+          <div className="flex items-center gap-3">
+            <LanguageSelector id="login-header-lang" variant="compact" />
+            <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
               <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
               SIH 2026 Prototype
             </span>

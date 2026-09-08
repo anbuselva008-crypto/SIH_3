@@ -1,14 +1,16 @@
-import { Target, Compass, BookOpen, Clock, ArrowRight, Award } from 'lucide-react';
+import { Target, Compass, BookOpen, Clock, ArrowRight, Award, Sparkles } from 'lucide-react';
 import type { RecommendationItem } from '../types/index.ts';
 
 interface NextLearningStepCardProps {
   item: RecommendationItem | null;
   onViewDetails: (item: RecommendationItem) => void;
+  onPracticeQuiz?: (item: RecommendationItem) => void;
 }
 
 export default function NextLearningStepCard({
   item,
   onViewDetails,
+  onPracticeQuiz,
 }: NextLearningStepCardProps) {
   if (!item) {
     return (
@@ -36,7 +38,7 @@ export default function NextLearningStepCard({
       className="relative overflow-hidden rounded-xl border-2 border-blue-600/30 bg-gradient-to-br from-white via-blue-50/20 to-slate-50 shadow-sm"
     >
       {/* Top Banner Stripe */}
-      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-800 text-white px-5 py-2.5 flex items-center justify-between">
+      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-800 text-white px-5 py-2.5 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center">
             <Target className="w-3.5 h-3.5" />
@@ -51,6 +53,10 @@ export default function NextLearningStepCard({
           </span>
           <span className="text-[11px] bg-amber-400 text-slate-900 px-2 py-0.5 rounded font-bold">
             Demo Catalogue
+          </span>
+          <span className="text-[11px] bg-indigo-400/30 text-indigo-100 border border-indigo-300/40 px-2 py-0.5 rounded font-medium flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-amber-300" />
+            AI Quiz Ready
           </span>
         </div>
       </div>
@@ -102,7 +108,7 @@ export default function NextLearningStepCard({
           </div>
 
           {/* Action CTA Panel */}
-          <div className="flex flex-col sm:flex-row lg:flex-col items-start lg:items-end justify-center gap-3 shrink-0 lg:border-l lg:border-slate-200 lg:pl-6">
+          <div className="flex flex-col sm:flex-row lg:flex-col items-start lg:items-end justify-center gap-2.5 shrink-0 lg:border-l lg:border-slate-200 lg:pl-6">
             <div className="text-left lg:text-right">
               <p className="text-xs text-slate-500">Cadre Relevance Score</p>
               <p className="text-2xl font-black text-blue-700">
@@ -111,15 +117,27 @@ export default function NextLearningStepCard({
               </p>
             </div>
 
-            <button
-              id="view-next-learning-step-btn"
-              onClick={() => onViewDetails(item)}
-              className="w-full sm:w-auto px-6 py-3 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer group"
-            >
-              <BookOpen className="w-4 h-4" />
-              <span>View Learning</span>
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-            </button>
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-2 w-full sm:w-auto">
+              <button
+                id="view-next-learning-step-btn"
+                onClick={() => onViewDetails(item)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer group"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>View Learning & AI Quiz</span>
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </button>
+
+              {onPracticeQuiz && (
+                <button
+                  onClick={() => onPracticeQuiz(item)}
+                  className="w-full sm:w-auto px-4 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Practice with AI Quiz</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

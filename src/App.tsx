@@ -9,9 +9,12 @@ import AssessmentModal from './components/AssessmentModal.tsx';
 import NextLearningStepCard from './components/NextLearningStepCard.tsx';
 import RecommendationsSection from './components/RecommendationsSection.tsx';
 import CourseDetailModal from './components/CourseDetailModal.tsx';
+import AIQuizModal from './components/AIQuizModal.tsx';
+import UploadMaterialModal from './components/UploadMaterialModal.tsx';
 import ApiStatusBadge from './components/ApiStatusBadge.tsx';
 import LoginView from './components/LoginView.tsx';
 import ProfileSetupView from './components/ProfileSetupView.tsx';
+import { useLanguage } from './i18n/LanguageContext.tsx';
 import { 
   getLearner, 
   getCompetencies, 
@@ -27,10 +30,13 @@ import type {
   AssessmentEvaluation,
   RecommendationResponse,
   RecommendationItem,
-  LearningResource
+  LearningResource,
+  Quiz,
+  SupportedLanguage
 } from './types/index.ts';
 
 export default function App() {
+  const { t, setLanguage } = useLanguage();
   const [learner, setLearner] = useState<LearnerProfile | null>(null);
   const [competencies, setCompetencies] = useState<CompetencyItem[]>([]);
   const [skillGapReport, setSkillGapReport] = useState<SkillGapReport | null>(null);
@@ -43,6 +49,10 @@ export default function App() {
   
   const [isAssessmentOpen, setIsAssessmentOpen] = useState<boolean>(false);
   const [assessmentFilter, setAssessmentFilter] = useState<string | null>(null);
+
+  // Stage 4 Upload & AI Quiz State
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [activeDirectQuiz, setActiveDirectQuiz] = useState<Quiz | null>(null);
 
   const [initialChecking, setInitialChecking] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
@@ -59,6 +69,9 @@ export default function App() {
         getLearner(learnerId)
           .then((profile) => {
             setLearner(profile);
+            if (profile.language_preference) {
+              setLanguage(profile.language_preference as SupportedLanguage);
+            }
             if (profile.profile_completed) {
               loadDashboardData(profile.id);
             }
@@ -234,6 +247,7 @@ export default function App() {
         learner={learner}
         onLogout={handleLogout}
         onResetBaseline={learner.is_demo ? handleResetBaseline : undefined} 
+        onOpenUpload={() => setIsUploadModalOpen(true)}
         resetting={resetting} 
       />
 
@@ -328,13 +342,13 @@ export default function App() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => handleOpenAssessment()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold transition-colors cursor-pointer"
                   >
                     <Zap className="w-3.5 h-3.5 text-amber-500" />
-                    Run Diagnostic Assessment
+                    {t('start_assessment')}
                   </button>
 
-                  <div className="flex items-center gap-2 text-xs text-slate-600 bg-white border border-slate-200 px-3 py-1 rounded-md">
+                  <div className="flex items-center gap-2 text-xs text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-md">
                     <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
                     <span>{competencies.length} Competencies Measured</span>
                   </div>
@@ -368,6 +382,10 @@ export default function App() {
             <NextLearningStepCard
               item={recommendations?.next_step || null}
               onViewDetails={(item) => {
+                setSelectedRecommendation(item);
+                setSelectedResourceFallback(null);
+              }}
+              onPracticeQuiz={(item) => {
                 setSelectedRecommendation(item);
                 setSelectedResourceFallback(null);
               }}
@@ -408,15 +426,48 @@ export default function App() {
         onAssessmentCompleted={handleAssessmentCompleted}
       />
 
-      {/* Stage 3 Course Details Modal */}
+      {/* Stage 3 & 4 Course Details & AI Quiz Modal */}
       <CourseDetailModal
         item={selectedRecommendation}
         resourceFallback={selectedResourceFallback}
+        learnerId={learner.id}
         onClose={() => {
           setSelectedRecommendation(null);
           setSelectedResourceFallback(null);
         }}
+        onQuizCompleted={() => {
+          setNotification('Grounded Practice Quiz attempt recorded. Baseline diagnostic scores remain protected.');
+          setTimeout(() => setNotification(null), 6000);
+        }}
       />
+
+      {/* Stage 4 Standalone Document Upload Modal */}
+      {isUploadModalOpen && (
+        <UploadMaterialModal
+          learnerId={learner.id}
+          onClose={() => setIsUploadModalOpen(false)}
+          onMaterialUploaded={(mat) => {
+            setNotification(`Document "${mat.original_filename}" processed & indexed for AI Quiz generation.`);
+            setTimeout(() => setNotification(null), 6000);
+          }}
+          onQuizGenerated={(quiz) => {
+            setActiveDirectQuiz(quiz);
+          }}
+        />
+      )}
+
+      {/* Stage 4 Active Direct AI Quiz Session */}
+      {activeDirectQuiz && (
+        <AIQuizModal
+          quiz={activeDirectQuiz}
+          learnerId={learner.id}
+          onClose={() => setActiveDirectQuiz(null)}
+          onQuizCompleted={() => {
+            setNotification('AI Practice Quiz assessment evaluated. Diagnostic baseline records preserved.');
+            setTimeout(() => setNotification(null), 6000);
+          }}
+        />
+      )}
 
       {/* Enterprise Government Style Footer */}
       <footer className="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">

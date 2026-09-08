@@ -7,6 +7,7 @@ import type {
   SkillGapReport, 
   SkillGapItem 
 } from '../database/models.ts';
+import { DomainPackService } from './domainPackService.ts';
 
 export class LearnerService {
   /**
@@ -16,7 +17,8 @@ export class LearnerService {
     const learner = await queryOne<Learner>(`
       SELECT id, name, role, department, email, 
              current_assignment, educational_qualification, years_of_experience, 
-             previous_training, profile_completed, is_demo, created_at
+             previous_training, profile_completed, is_demo, created_at,
+             job_family_id, role_id, job_family, language_preference
       FROM learners
       WHERE id = ${learnerId}
     `);
@@ -64,7 +66,7 @@ export class LearnerService {
     const existing = await query<Competency>(`
       SELECT id, name FROM competencies WHERE learner_id = ${learnerId}
     `);
-    const existingNames = new Set(existing.map((c) => c.name));
+    const existingNames = new Set(existing.map((c) => c.name.toLowerCase()));
 
     const defaults = [
       { name: 'Statistics', category: 'Methodology & Theory', target: 75 },
@@ -74,12 +76,41 @@ export class LearnerService {
     ];
 
     for (const def of defaults) {
-      if (!existingNames.has(def.name)) {
+      if (!existingNames.has(def.name.toLowerCase())) {
         await execute(`
           INSERT INTO competencies (learner_id, name, score, max_score, category, benchmark_target)
           VALUES (${learnerId}, '${def.name}', 0, 100, '${def.category}', ${def.target})
         `);
       }
+    }
+  }
+
+  /**
+   * Ensures competencies appropriate for the officer's specific role exist.
+   * If the role has defined required competencies in the Universal Government Framework,
+   * seeds those competencies; otherwise falls back gracefully to default competencies.
+   */
+  static async ensureRoleCompetencies(learnerId: number, roleId?: string): Promise<void> {
+    const existing = await query<Competency>(`
+      SELECT id, name FROM competencies WHERE learner_id = ${learnerId}
+    `);
+    const existingNames = new Set(existing.map((c) => c.name.toLowerCase()));
+
+    const role = roleId ? DomainPackService.getRoleById(roleId) : undefined;
+    const roleCompetencies = role ? role.required_competencies : [];
+
+    if (roleCompetencies.length > 0) {
+      for (const req of roleCompetencies) {
+        const compName = req.name || (req as any).competency_name;
+        if (compName && !existingNames.has(compName.toLowerCase())) {
+          await execute(`
+            INSERT INTO competencies (learner_id, name, score, max_score, category, benchmark_target)
+            VALUES (${learnerId}, '${compName.replace(/'/g, "''")}', 0, 100, '${req.category.replace(/'/g, "''")}', ${req.benchmark_target})
+          `);
+        }
+      }
+    } else {
+      await this.ensureDefaultCompetencies(learnerId);
     }
   }
 
@@ -145,6 +176,7 @@ export class LearnerService {
 
   /**
    * Profile Setup: Saves new or updated officer profile and marks profile_completed = true.
+   * Resolves Role and Job Family against the Universal Government Framework.
    */
   static async saveProfileSetup(
     learnerId: number,
@@ -156,6 +188,9 @@ export class LearnerService {
       educational_qualification: string;
       years_of_experience: number;
       previous_training?: string;
+      job_family_id?: string;
+      role_id?: string;
+      language_preference?: string;
     }
   ): Promise<LearnerResponse> {
     // Validate required fields
@@ -179,11 +214,24 @@ export class LearnerService {
       throw new Error('Years of Experience must be a valid non-negative number.');
     }
 
+    // Resolve Role and Job Family via DomainPackService
+    const resolvedRole = DomainPackService.resolveRole(data.role_id || data.role, data.department);
+    const resolvedJobFamily = DomainPackService.getJobFamilyById(data.job_family_id || resolvedRole.job_family_id);
+
+    const jobFamilyId = resolvedJobFamily ? resolvedJobFamily.id : resolvedRole.job_family_id;
+    const roleId = resolvedRole.id;
+    const jobFamilyName = resolvedJobFamily ? resolvedJobFamily.name : 'Public Service Cadre';
+    const lang = (data.language_preference || 'en').trim();
+
     // Update in database
     await execute(`
       UPDATE learners
       SET name = '${data.name.trim().replace(/'/g, "''")}',
           role = '${data.role.trim().replace(/'/g, "''")}',
+          role_id = '${roleId}',
+          job_family_id = '${jobFamilyId}',
+          job_family = '${jobFamilyName.replace(/'/g, "''")}',
+          language_preference = '${lang.replace(/'/g, "''")}',
           department = '${data.department.trim().replace(/'/g, "''")}',
           current_assignment = '${data.current_assignment.trim().replace(/'/g, "''")}',
           educational_qualification = '${data.educational_qualification.trim().replace(/'/g, "''")}',
@@ -193,8 +241,8 @@ export class LearnerService {
       WHERE id = ${learnerId}
     `);
 
-    // Ensure competencies exist
-    await this.ensureDefaultCompetencies(learnerId);
+    // Ensure role-specific competencies exist
+    await this.ensureRoleCompetencies(learnerId, roleId);
 
     const updated = await this.getLearnerProfile(learnerId);
     if (!updated) {
@@ -216,20 +264,38 @@ export class LearnerService {
   }
 
   /**
-   * Retrieves assessment questions for a diagnostic evaluation.
+   * Retrieves assessment questions for a diagnostic evaluation,
+   * optionally filtered by competency or cadre role.
    */
-  static async getAssessmentQuestions(competency?: string): Promise<AssessmentQuestion[]> {
+  static async getAssessmentQuestions(competency?: string, roleId?: string): Promise<AssessmentQuestion[]> {
     let sql = `
-      SELECT id, competency_name, category, difficulty, question_text, 
+      SELECT id, job_family_id, role_id, competency_name, category, difficulty, question_text, 
              option_a, option_b, option_c, option_d, correct_option, explanation, concept_tag, weight
       FROM assessment_questions
     `;
+    const conditions: string[] = [];
     if (competency) {
-      sql += ` WHERE competency_name = '${competency.replace(/'/g, "''")}'`;
+      conditions.push(`competency_name = '${competency.replace(/'/g, "''")}'`);
+    }
+    if (roleId) {
+      conditions.push(`role_id = '${roleId.replace(/'/g, "''")}'`);
+    }
+    if (conditions.length > 0) {
+      sql += ` WHERE ` + conditions.join(' AND ');
     }
     sql += ` ORDER BY id ASC`;
 
-    const rows = await query<any>(sql);
+    let rows = await query<any>(sql);
+    // If no questions found with specific roleId, fall back to all questions or statistical
+    if (rows.length === 0 && roleId) {
+      rows = await query<any>(`
+        SELECT id, job_family_id, role_id, competency_name, category, difficulty, question_text, 
+               option_a, option_b, option_c, option_d, correct_option, explanation, concept_tag, weight
+        FROM assessment_questions
+        ORDER BY id ASC
+      `);
+    }
+
     return rows.map((r) => ({
       id: r.id,
       competency_name: r.competency_name,
@@ -358,10 +424,26 @@ export class LearnerService {
 
   /**
    * Generates a rigorous Skill Gap Analysis and prioritized focus areas
-   * for the official statistical cadre role (Statistical Officer, Survey Division).
+   * for the officer's specific cadre role and competencies.
    */
   static async getSkillGapAnalysis(learnerId: number = 1): Promise<SkillGapReport> {
     const competencies = await this.getCompetencies(learnerId);
+    const learner = await queryOne<Learner>(`SELECT role, role_id, department FROM learners WHERE id = ${learnerId}`);
+
+    // Resolve role definition for dynamic criticality metadata
+    const resolvedRole = learner 
+      ? DomainPackService.resolveRole(learner.role_id || learner.role, learner.department)
+      : undefined;
+
+    const roleReqMap = new Map<string, any>();
+    if (resolvedRole?.required_competencies) {
+      for (const rc of resolvedRole.required_competencies) {
+        const cName = rc.name || (rc as any).competency_name;
+        if (cName) {
+          roleReqMap.set(cName.toLowerCase(), rc);
+        }
+      }
+    }
 
     const criticalityMeta: Record<string, { roleCriticality: string; defaultAction: string }> = {
       'Python': {
@@ -400,10 +482,19 @@ export class LearnerService {
         priorityLevel = 'Low';
       }
 
-      const meta = criticalityMeta[c.name] || {
-        roleCriticality: 'Operational Competency for Statistical Officer.',
-        defaultAction: 'Follow recommended MoSPI training curricula.',
-      };
+      let roleCrit = 'Operational Competency for ' + (resolvedRole?.name || 'Government Officer') + '.';
+      let defAction = 'Follow recommended government training curricula.';
+
+      if (criticalityMeta[c.name]) {
+        roleCrit = criticalityMeta[c.name].roleCriticality;
+        defAction = criticalityMeta[c.name].defaultAction;
+      } else {
+        const rc = roleReqMap.get(c.name.toLowerCase());
+        if (rc) {
+          roleCrit = `${rc.criticality} — Essential competency for ${resolvedRole?.name || 'cadre'} duties in ${c.category}.`;
+          defAction = `Complete targeted curricula in ${c.name} to meet target level (${rc.target_level}).`;
+        }
+      }
 
       return {
         competency_id: c.id,
@@ -416,10 +507,10 @@ export class LearnerService {
         status,
         priority_level: priorityLevel,
         priority_rank: 0, // to be ranked
-        role_criticality: meta.roleCriticality,
+        role_criticality: roleCrit,
         action_directive:
           status === 'critical_gap'
-            ? `Critical Priority: Deficit of ${gap}% below benchmark. ${meta.defaultAction}`
+            ? `Critical Priority: Deficit of ${gap}% below benchmark. ${defAction}`
             : status === 'moderate_gap'
             ? `Moderate Priority: Deficit of ${gap}%. Bridge remaining delta through focused module review.`
             : `Benchmark Achieved: Met/exceeded standard (+${c.score - c.benchmark_target}%). Recommended for advanced elective mentoring.`,
