@@ -674,6 +674,154 @@ export interface PlanAdjustmentInput {
   reason?: string;
 }
 
+// ==========================================
+// STAGE 5E — AI-Powered Adaptive Learning Coach Models
+// ==========================================
+
+export type AICoachDifficultyLevel = 'Foundational' | 'Applied' | 'Advanced';
+export type AICoachActionType = 'EXPLAIN' | 'PRACTICE' | 'SCENARIO' | 'MISTAKE' | 'REFLECTION' | 'NEXT_WEEK';
+
+export interface AICoachContext {
+  officerRole: string;
+  department: string;
+  field: string;
+  educationalQualification: string;
+  targetCompetencies: string[];
+  currentCompetencyScores: Record<string, number>;
+  priorityGaps: string[];
+  currentWeek: number;
+  weeklyPlan: {
+    id: number;
+    focusTopic: string;
+    whyThisMatters: string;
+    learningGoal: string;
+    adaptationReason?: string | null;
+    momentumStatus: string;
+  };
+  completedActivities: Array<{
+    id: number;
+    title: string;
+    activityType: string;
+    topicTag: string;
+  }>;
+  checkpointPerformance?: {
+    scorePercentage: number;
+    progressRating: string;
+    strongTopics: string[];
+    weakTopics: string[];
+  } | null;
+  previousWeekPerformance?: {
+    scorePercentage: number;
+    weakTopics: string[];
+  } | null;
+  preferredStudyMinutes: number;
+  preferredStudyDays: string[];
+  preferredLanguage: string;
+}
+
+export interface AILearningExplanation {
+  title: string;
+  simpleExplanation: string;
+  keyPoints: string[];
+  practicalExample: string;
+  commonMistakes: string[];
+  estimatedMinutes: number;
+  cadreContext?: string;
+  isFallback?: boolean;
+  provider?: string;
+}
+
+export interface AIPracticeExercise {
+  title: string;
+  instructions: string;
+  scenario: string;
+  task: string;
+  expectedOutcome: string;
+  estimatedMinutes: number;
+  difficultyLevel: AICoachDifficultyLevel;
+  competencyInvolved?: string;
+  isFallback?: boolean;
+  provider?: string;
+}
+
+export interface AIScenario {
+  title: string;
+  situation: string;
+  decisionQuestion: string;
+  options: string[];
+  correctOption: number;
+  rationale: string;
+  competencyInvolved: string;
+  difficultyLevel: AICoachDifficultyLevel;
+  isFallback?: boolean;
+  provider?: string;
+}
+
+export interface AIScenarioEvaluation {
+  isCorrect: boolean;
+  selectedOption: number;
+  correctOption: number;
+  rationale: string;
+  competencyInvolved: string;
+  improvementTip: string;
+  practicalApplication: string;
+  retryScenario?: AIScenario | null;
+}
+
+export interface AIMistakeRetryQuestion {
+  questionText: string;
+  options: string[];
+  correctOption: number;
+  explanation: string;
+}
+
+export interface AIMistakeExplanation {
+  whatWentWrong: string;
+  whyItMatters: string;
+  correctConcept: string;
+  example: string;
+  retryQuestion: AIMistakeRetryQuestion;
+  isFallback?: boolean;
+  provider?: string;
+}
+
+export interface AIReflectionSummary {
+  whatYouImproved: string[];
+  whatStillNeedsAttention: string[];
+  whatToFocusOnNext: string[];
+  coachMessage: string;
+  completionScoreRatio: string;
+  isFallback?: boolean;
+  provider?: string;
+}
+
+export interface AINextWeekRecommendation {
+  priorityArea: string;
+  reason: string;
+  recommendedActivities: string[];
+  recommendedMinutes: number;
+  difficultyLevel: AICoachDifficultyLevel;
+  adaptiveDirection: 'Reinforcement' | 'Consolidation' | 'Advanced Acceleration';
+  isFallback?: boolean;
+  provider?: string;
+}
+
+export interface AICoachInteractionRecord {
+  id: number;
+  learner_id: number;
+  weekly_plan_id: number;
+  interaction_type: AICoachActionType;
+  competency_name?: string;
+  topic_tag?: string;
+  language?: string;
+  prompt_summary?: string;
+  ai_output: string;
+  provider: string;
+  is_fallback: boolean;
+  created_at?: string;
+}
+
+
 
 
 

@@ -370,6 +370,21 @@ export function initDatabase() {
       status VARCHAR(50) NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS ai_coach_interactions (
+      id SERIAL PRIMARY KEY,
+      learner_id INTEGER REFERENCES learners(id) ON DELETE CASCADE,
+      weekly_plan_id INTEGER REFERENCES weekly_learning_plans(id) ON DELETE CASCADE,
+      interaction_type VARCHAR(50) NOT NULL,
+      competency_name VARCHAR(150),
+      topic_tag VARCHAR(150),
+      language VARCHAR(20) DEFAULT 'en',
+      prompt_summary TEXT,
+      ai_output TEXT NOT NULL,
+      provider VARCHAR(50) DEFAULT 'Groq',
+      is_fallback BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Check if data already exists

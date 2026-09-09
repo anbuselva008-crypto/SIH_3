@@ -9,6 +9,7 @@ import { LearningDiscoveryService } from '../services/learningDiscovery/discover
 import { VerificationService } from '../services/learningDiscovery/verificationService.ts';
 import { LearningPathService } from '../services/learningPath/learningPathService.ts';
 import { AdaptiveLearningPlannerService } from '../services/weeklyPlanner/adaptivePlannerService.ts';
+import { AICoachService } from '../services/weeklyPlanner/aiCoachService.ts';
 import { getActiveAIProvider } from '../services/aiProvider.ts';
 import { getDbStatus } from '../database/db.ts';
 
@@ -1587,6 +1588,254 @@ router.post('/weekly-plans/:id/adjust', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to adjust weekly plan',
+    });
+  }
+});
+
+// =========================================================================
+// STAGE 5E — AI-Powered Adaptive Learning Coach Endpoints
+// =========================================================================
+
+/**
+ * GET /api/weekly-plans/:id/ai-coach/context
+ * Returns normalized, privacy-safe AI learning context object.
+ */
+router.get('/weekly-plans/:id/ai-coach/context', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.query.learner_id || req.query.learnerId || req.query.id;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+    const language = (req.query.language as string) || 'en';
+
+    const context = await AICoachService.buildLearningContext(planId ? planId : 1, planId, language);
+    return res.json({
+      success: true,
+      data: context,
+    });
+  } catch (error) {
+    console.error('Error building AI coach context:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to build AI coach context',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/ai-coach/explain
+ * Generates personalized, role-relevant learning explanation for a topic or item.
+ */
+router.post('/weekly-plans/:id/ai-coach/explain', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.body.learnerId;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+    const topic = req.body.topic || 'Core Statutory Procedures';
+    const itemId = req.body.itemId ? parseInt(req.body.itemId, 10) : undefined;
+    const language = req.body.language || 'en';
+
+    const context = await AICoachService.buildLearningContext(learnerId, planId, language);
+    const explanation = await AICoachService.explainTopic(context, topic, itemId);
+
+    return res.json({
+      success: true,
+      data: explanation,
+    });
+  } catch (error) {
+    console.error('Error generating AI explanation:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate explanation',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/ai-coach/practice
+ * Generates calibrated practice exercise strictly aligned with deterministic difficulty.
+ */
+router.post('/weekly-plans/:id/ai-coach/practice', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.body.learnerId;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+    const topic = req.body.topic || 'Administrative Verification Drill';
+    const itemId = req.body.itemId ? parseInt(req.body.itemId, 10) : undefined;
+    const language = req.body.language || 'en';
+
+    const context = await AICoachService.buildLearningContext(learnerId, planId, language);
+    const practice = await AICoachService.generatePractice(context, topic, itemId);
+
+    return res.json({
+      success: true,
+      data: practice,
+    });
+  } catch (error) {
+    console.error('Error generating AI practice:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate practice',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/ai-coach/scenario
+ * Generates an interactive decision-making administrative scenario.
+ */
+router.post('/weekly-plans/:id/ai-coach/scenario', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.body.learnerId;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+    const topic = req.body.topic || 'Operational Governance';
+    const itemId = req.body.itemId ? parseInt(req.body.itemId, 10) : undefined;
+    const language = req.body.language || 'en';
+
+    const context = await AICoachService.buildLearningContext(learnerId, planId, language);
+    const scenario = await AICoachService.generateScenario(context, topic, itemId);
+
+    return res.json({
+      success: true,
+      data: scenario,
+    });
+  } catch (error) {
+    console.error('Error generating AI scenario:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate scenario',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/ai-coach/scenario/evaluate
+ * Evaluates the officer's option selection on a scenario and provides constructive feedback.
+ */
+router.post('/weekly-plans/:id/ai-coach/scenario/evaluate', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.body.learnerId;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+    const scenario = req.body.scenario;
+    const selectedOption = parseInt(req.body.selectedOption, 10);
+    const language = req.body.language || 'en';
+
+    if (!scenario || isNaN(selectedOption)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing scenario or selectedOption',
+      });
+    }
+
+    const context = await AICoachService.buildLearningContext(learnerId, planId, language);
+    const evaluation = await AICoachService.evaluateScenarioResponse(context, scenario, selectedOption, language);
+
+    return res.json({
+      success: true,
+      data: evaluation,
+    });
+  } catch (error) {
+    console.error('Error evaluating scenario response:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to evaluate scenario response',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/ai-coach/explain-mistake
+ * Explains why a checkpoint answer was wrong, providing root cause, consequence, and instant retry.
+ */
+router.post('/weekly-plans/:id/ai-coach/explain-mistake', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.body.learnerId;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+    const { questionText, selectedOptionText, correctOptionText, topicTag, existingExplanation, language } = req.body;
+
+    if (!questionText || !selectedOptionText || !correctOptionText) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing questionText, selectedOptionText, or correctOptionText',
+      });
+    }
+
+    const context = await AICoachService.buildLearningContext(learnerId, planId, language || 'en');
+    const mistakeExplanation = await AICoachService.explainMistake(
+      context,
+      questionText,
+      selectedOptionText,
+      correctOptionText,
+      topicTag || 'Core Procedures',
+      existingExplanation,
+      language || 'en'
+    );
+
+    return res.json({
+      success: true,
+      data: mistakeExplanation,
+    });
+  } catch (error) {
+    console.error('Error generating mistake explanation:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to explain mistake',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/ai-coach/reflection
+ * Generates an end-of-week reflection summary.
+ */
+router.post('/weekly-plans/:id/ai-coach/reflection', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.body.learnerId;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+    const language = req.body.language || 'en';
+
+    const context = await AICoachService.buildLearningContext(learnerId, planId, language);
+    const reflection = await AICoachService.generateWeeklyReflection(context, language);
+
+    return res.json({
+      success: true,
+      data: reflection,
+    });
+  } catch (error) {
+    console.error('Error generating weekly reflection:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate weekly reflection',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/ai-coach/next-week-recommendation
+ * Generates AI-personalized next week topics, activities, and study cadence based on deterministic direction.
+ */
+router.post('/weekly-plans/:id/ai-coach/next-week-recommendation', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.body.learnerId;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+    const language = req.body.language || 'en';
+
+    const context = await AICoachService.buildLearningContext(learnerId, planId, language);
+    const recommendation = await AICoachService.recommendNextWeek(context, language);
+
+    return res.json({
+      success: true,
+      data: recommendation,
+    });
+  } catch (error) {
+    console.error('Error generating next-week recommendation:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate recommendation',
     });
   }
 });

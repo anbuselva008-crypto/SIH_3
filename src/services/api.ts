@@ -26,7 +26,15 @@ import type {
   WeeklyCheckpointQuestion,
   WeeklyCheckpointResult,
   SchedulePreferencesInput,
-  PlanAdjustmentInput
+  PlanAdjustmentInput,
+  AICoachContext,
+  AILearningExplanation,
+  AIPracticeExercise,
+  AIScenario,
+  AIScenarioEvaluation,
+  AIMistakeExplanation,
+  AIReflectionSummary,
+  AINextWeekRecommendation
 } from '../types/index.ts';
 
 const BASE_URL = '/api';
