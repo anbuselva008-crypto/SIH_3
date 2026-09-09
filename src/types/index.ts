@@ -465,5 +465,76 @@ export interface DiscoveryResponse {
   };
 }
 
+// ==========================================
+// STAGE 5C — Personalized Learning Path Types
+// ==========================================
+
+export type StepType = 'Foundation' | 'Concept' | 'Practical' | 'Scenario' | 'Review' | 'Assessment';
+export type StepStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'LOCKED';
+
+export interface LearningPathStepItem {
+  id: number;
+  learning_path_id: number;
+  step_number: number;
+  title: string;
+  purpose: string;
+  step_type: StepType;
+  competency: string;
+  estimated_effort?: string | null;
+  prerequisite?: string | null;
+  prerequisite_met: boolean;
+  resource_url?: string;
+  section_ref?: string | null;
+  completion_condition: string;
+  status: StepStatus;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface LearningPathDetail {
+  id: number;
+  learner_id: number;
+  target_competency: string;
+  current_score: number;
+  target_score: number;
+  current_level: 'Beginner' | 'Intermediate' | 'Advanced';
+  target_level: 'Intermediate' | 'Advanced' | 'Expert';
+  learning_goal: string;
+  role_name: string;
+  assignment_name: string;
+  resource_id?: string;
+  resource_title: string;
+  resource_url: string;
+  provider_name: string;
+  resource_type: string;
+  is_official_structure: boolean;
+  structure_label: string;
+  total_steps: number;
+  future_skill_note?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  steps: LearningPathStepItem[];
+  completed_steps_count: number;
+  progress_percentage: number;
+  active_step_number: number;
+}
+
+export interface LearningPathSummary {
+  id: number;
+  target_competency: string;
+  current_level: string;
+  target_level: string;
+  learning_goal: string;
+  resource_title: string;
+  provider_name: string;
+  total_steps: number;
+  completed_steps_count: number;
+  progress_percentage: number;
+  active_step_number: number;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  updated_at?: string;
+}
+
+
 
 

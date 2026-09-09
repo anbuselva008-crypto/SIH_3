@@ -6,6 +6,7 @@ interface NextLearningStepCardProps {
   onViewDetails: (item: RecommendationItem) => void;
   onPracticeQuiz?: (item: RecommendationItem) => void;
   onDiscoverResources?: (skill: string) => void;
+  onBuildLearningPath?: (skill: string) => void;
 }
 
 export default function NextLearningStepCard({
@@ -13,6 +14,7 @@ export default function NextLearningStepCard({
   onViewDetails,
   onPracticeQuiz,
   onDiscoverResources,
+  onBuildLearningPath,
 }: NextLearningStepCardProps) {
   if (!item) {
     return (
@@ -120,14 +122,25 @@ export default function NextLearningStepCard({
             </div>
 
             <div className="flex flex-col sm:flex-row lg:flex-col gap-2 w-full sm:w-auto">
+              {onBuildLearningPath && (
+                <button
+                  id="start-next-step-learning-path-btn"
+                  onClick={() => onBuildLearningPath(resource.competency)}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer group"
+                >
+                  <Compass className="w-4 h-4 text-emerald-200" />
+                  <span>Personalized Learning Path</span>
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </button>
+              )}
+
               <button
                 id="view-next-learning-step-btn"
                 onClick={() => onViewDetails(item)}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer group"
+                className="w-full sm:w-auto px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
               >
                 <BookOpen className="w-4 h-4" />
-                <span>View Learning & AI Quiz</span>
-                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                <span>View Course & Syllabus</span>
               </button>
 
               {onPracticeQuiz && (

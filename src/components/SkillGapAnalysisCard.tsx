@@ -6,6 +6,7 @@ interface SkillGapAnalysisProps {
   loading: boolean;
   onStartAssessment: (competencyName?: string) => void;
   onFindResources?: (competencyName: string) => void;
+  onBuildLearningPath?: (competencyName: string) => void;
 }
 
 export default function SkillGapAnalysisCard({
@@ -13,6 +14,7 @@ export default function SkillGapAnalysisCard({
   loading,
   onStartAssessment,
   onFindResources,
+  onBuildLearningPath,
 }: SkillGapAnalysisProps) {
   if (loading) {
     return (
@@ -179,6 +181,17 @@ export default function SkillGapAnalysisCard({
                     </div>
                     
                     <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+                      {onBuildLearningPath && (
+                        <button
+                          onClick={() => onBuildLearningPath(item.name)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold shadow-2xs transition-colors cursor-pointer"
+                          title="Generate or continue step-by-step personalized learning path"
+                        >
+                          <Compass className="w-3 h-3 text-emerald-200" />
+                          <span>Learning Path</span>
+                        </button>
+                      )}
+
                       {onFindResources && (
                         <button
                           onClick={() => onFindResources(item.name)}

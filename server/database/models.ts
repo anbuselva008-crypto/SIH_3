@@ -205,3 +205,69 @@ export interface QuizAnswerDetail {
   source_reference: SourceReference | null;
 }
 
+// ==========================================
+// STAGE 5C — Learning Path Models
+// ==========================================
+
+export type StepType = 'Foundation' | 'Concept' | 'Practical' | 'Scenario' | 'Review' | 'Assessment';
+export type StepStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'LOCKED';
+
+export interface LearningPath {
+  id: number;
+  learner_id: number;
+  target_competency: string;
+  current_score: number;
+  target_score: number;
+  current_level: 'Beginner' | 'Intermediate' | 'Advanced';
+  target_level: 'Intermediate' | 'Advanced' | 'Expert';
+  learning_goal: string;
+  role_name: string;
+  assignment_name: string;
+  resource_id?: string;
+  resource_title: string;
+  resource_url: string;
+  provider_name: string;
+  resource_type: string;
+  is_official_structure: boolean;
+  structure_label: string;
+  total_steps: number;
+  future_skill_note?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LearningPathStep {
+  id: number;
+  learning_path_id: number;
+  step_number: number;
+  title: string;
+  purpose: string;
+  step_type: StepType;
+  competency: string;
+  estimated_effort?: string | null;
+  prerequisite?: string | null;
+  prerequisite_met: boolean;
+  resource_url?: string;
+  section_ref?: string | null;
+  completion_condition: string;
+  created_at?: string;
+}
+
+export interface LearnerPathStepProgress {
+  id: number;
+  learner_id: number;
+  learning_path_id: number;
+  step_id: number;
+  status: StepStatus;
+  started_at?: string | null;
+  completed_at?: string | null;
+  updated_at?: string;
+}
+
+export interface LearningPathWithProgress extends LearningPath {
+  steps: Array<LearningPathStep & { status: StepStatus; started_at?: string | null; completed_at?: string | null }>;
+  completed_steps_count: number;
+  progress_percentage: number;
+  active_step_number: number;
+}
+

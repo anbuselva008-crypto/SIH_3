@@ -7,6 +7,7 @@ import { QuizService } from '../services/quizService.ts';
 import { DomainPackService } from '../services/domainPackService.ts';
 import { LearningDiscoveryService } from '../services/learningDiscovery/discoveryService.ts';
 import { VerificationService } from '../services/learningDiscovery/verificationService.ts';
+import { LearningPathService } from '../services/learningPath/learningPathService.ts';
 import { getActiveAIProvider } from '../services/aiProvider.ts';
 import { getDbStatus } from '../database/db.ts';
 
@@ -1051,6 +1052,218 @@ router.get('/domain/future-skills', (req: Request, res: Response) => {
     return res.json({ success: true, data: allSkills });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'Failed to retrieve future skills' });
+  }
+});
+
+// ==========================================
+// STAGE 5C — Personalized Learning Path Endpoints
+// ==========================================
+
+/**
+ * POST /api/learning-paths/generate
+ * Generates or retrieves a personalized, progressive learning path for an officer's skill gap.
+ */
+router.post('/learning-paths/generate', async (req: Request, res: Response) => {
+  try {
+    const { learner_id, skill_gap, resource, resource_id, target_score, force_new } = req.body;
+    const learnerId = parseInt(learner_id, 10);
+    if (isNaN(learnerId) || !skill_gap) {
+      return res.status(400).json({
+        success: false,
+        error: 'learner_id and skill_gap are required to build a learning path.',
+      });
+    }
+
+    const path = await LearningPathService.generateOrGetPath({
+      learnerId,
+      skillGap: skill_gap,
+      resource: resource || null,
+      resourceId: resource_id || null,
+      targetScore: target_score ? parseInt(target_score, 10) : 75,
+      forceNew: Boolean(force_new),
+    });
+
+    return res.json({
+      success: true,
+      data: path,
+    });
+  } catch (error) {
+    console.error('Error generating learning path:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate learning path',
+    });
+  }
+});
+
+/**
+ * GET /api/learners/:id/learning-paths
+ * Returns all learning paths created for a learner.
+ */
+router.get('/learners/:id/learning-paths', async (req: Request, res: Response) => {
+  try {
+    const learnerId = parseInt(req.params.id, 10);
+    if (isNaN(learnerId)) {
+      return res.status(400).json({ success: false, error: 'Invalid learner ID' });
+    }
+
+    const paths = await LearningPathService.getLearnerPaths(learnerId);
+    return res.json({
+      success: true,
+      data: paths,
+    });
+  } catch (error) {
+    console.error('Error retrieving learner paths:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to retrieve learner paths',
+    });
+  }
+});
+
+/**
+ * GET /api/learning-paths/:id
+ * Returns a specific learning path with all steps and learner progress.
+ */
+router.get('/learning-paths/:id', async (req: Request, res: Response) => {
+  try {
+    const pathId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.query.learner_id || req.query.id;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+
+    if (isNaN(pathId) || isNaN(learnerId)) {
+      return res.status(400).json({ success: false, error: 'Invalid path ID or learner ID' });
+    }
+
+    const path = await LearningPathService.getFullPathWithProgress(pathId, learnerId);
+    return res.json({
+      success: true,
+      data: path,
+    });
+  } catch (error) {
+    console.error('Error retrieving learning path:', error);
+    return res.status(404).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Learning path not found',
+    });
+  }
+});
+
+/**
+ * POST /api/learning-paths/:id/steps/:stepId/start
+ * Starts a step (marks as IN_PROGRESS).
+ */
+router.post('/learning-paths/:id/steps/:stepId/start', async (req: Request, res: Response) => {
+  try {
+    const pathId = parseInt(req.params.id, 10);
+    const stepId = parseInt(req.params.stepId, 10);
+    const learnerId = req.body.learner_id ? parseInt(req.body.learner_id, 10) : 1;
+
+    const path = await LearningPathService.startStep(pathId, stepId, learnerId);
+    return res.json({
+      success: true,
+      data: path,
+    });
+  } catch (error) {
+    console.error('Error starting step:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to start step',
+    });
+  }
+});
+
+/**
+ * POST /api/learning-paths/:id/steps/:stepId/complete
+ * Marks a step as COMPLETED, records timestamp, and unlocks next step.
+ */
+router.post('/learning-paths/:id/steps/:stepId/complete', async (req: Request, res: Response) => {
+  try {
+    const pathId = parseInt(req.params.id, 10);
+    const stepId = parseInt(req.params.stepId, 10);
+    const learnerId = req.body.learner_id ? parseInt(req.body.learner_id, 10) : 1;
+
+    const path = await LearningPathService.completeStep(pathId, stepId, learnerId);
+    return res.json({
+      success: true,
+      data: path,
+    });
+  } catch (error) {
+    console.error('Error completing step:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to complete step',
+    });
+  }
+});
+
+/**
+ * GET /api/learning-paths/:id/alternatives
+ * Provides verified Stage 5B alternatives for switching resource.
+ */
+router.get('/learning-paths/:id/alternatives', async (req: Request, res: Response) => {
+  try {
+    const pathId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.query.learner_id || req.query.id;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+
+    const alternatives = await LearningPathService.getAlternativeResources(pathId, learnerId);
+    return res.json({
+      success: true,
+      data: alternatives,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Failed to retrieve alternatives' });
+  }
+});
+
+/**
+ * POST /api/learning-paths/:id/switch-resource
+ * Switches resource of an existing path to an alternative verified resource.
+ */
+router.post('/learning-paths/:id/switch-resource', async (req: Request, res: Response) => {
+  try {
+    const pathId = parseInt(req.params.id, 10);
+    const { learner_id, new_resource } = req.body;
+    const learnerId = parseInt(learner_id, 10);
+
+    if (!new_resource) {
+      return res.status(400).json({ success: false, error: 'new_resource is required' });
+    }
+
+    const updatedPath = await LearningPathService.switchResource(pathId, learnerId, new_resource);
+    return res.json({
+      success: true,
+      data: updatedPath,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to switch resource',
+    });
+  }
+});
+
+/**
+ * GET /api/learning-paths/:id/quiz
+ * Connects the Assessment step to Stage 4 Grounded AI Quiz.
+ */
+router.get('/learning-paths/:id/quiz', async (req: Request, res: Response) => {
+  try {
+    const pathId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.query.learner_id || req.query.id;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+
+    const quiz = await LearningPathService.getOrCreatePracticeQuiz(pathId, learnerId);
+    return res.json({
+      success: true,
+      data: quiz,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to retrieve practice quiz',
+    });
   }
 });
 

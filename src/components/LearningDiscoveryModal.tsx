@@ -25,6 +25,7 @@ import {
 import type { DiscoveredResource, DiscoveryResponse, SupportedLanguage, VerificationStatus } from '../types/index.ts';
 import { fetchLearningDiscovery } from '../services/api.ts';
 import { getDiscoveryT } from '../i18n/discoveryTranslations.ts';
+import { getLearningPathT } from '../i18n/learningPathTranslations.ts';
 
 interface LearningDiscoveryModalProps {
   skillGap: string;
@@ -33,6 +34,7 @@ interface LearningDiscoveryModalProps {
   onClose: () => void;
   onViewResourceDetails?: (resource: DiscoveredResource) => void;
   onSelectSkillGap?: (newSkill: string) => void;
+  onBuildLearningPath?: (resource: DiscoveredResource) => void;
 }
 
 export default function LearningDiscoveryModal({
@@ -42,8 +44,10 @@ export default function LearningDiscoveryModal({
   onClose,
   onViewResourceDetails,
   onSelectSkillGap,
+  onBuildLearningPath,
 }: LearningDiscoveryModalProps) {
   const t = getDiscoveryT(language);
+  const tPath = getLearningPathT(language);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DiscoveryResponse | null>(null);
@@ -358,7 +362,18 @@ export default function LearningDiscoveryModal({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {onBuildLearningPath && (
+                        <button
+                          id="build-learning-path-btn"
+                          onClick={() => onBuildLearningPath(bestMatch)}
+                          className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Compass className="w-3.5 h-3.5" />
+                          <span>{tPath.build_learning_path}</span>
+                        </button>
+                      )}
+
                       {onViewResourceDetails && (
                         <button
                           onClick={() => onViewResourceDetails(bestMatch)}
@@ -433,7 +448,16 @@ export default function LearningDiscoveryModal({
                           <span className="text-[11px] text-slate-500 truncate max-w-[150px]">
                             {item.provider_name}
                           </span>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {onBuildLearningPath && (
+                              <button
+                                onClick={() => onBuildLearningPath(item)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                <Compass className="w-3 h-3 text-emerald-600" />
+                                <span>Build Path</span>
+                              </button>
+                            )}
                             {onViewResourceDetails && (
                               <button
                                 onClick={() => onViewResourceDetails(item)}

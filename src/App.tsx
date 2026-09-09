@@ -10,6 +10,7 @@ import NextLearningStepCard from './components/NextLearningStepCard.tsx';
 import RecommendationsSection from './components/RecommendationsSection.tsx';
 import CourseDetailModal from './components/CourseDetailModal.tsx';
 import LearningDiscoveryModal from './components/LearningDiscoveryModal.tsx';
+import LearningPathModal from './components/LearningPathModal.tsx';
 import AIQuizModal from './components/AIQuizModal.tsx';
 import UploadMaterialModal from './components/UploadMaterialModal.tsx';
 import ApiStatusBadge from './components/ApiStatusBadge.tsx';
@@ -60,6 +61,11 @@ export default function App() {
   // Stage 5A Intelligent Discovery State
   const [isDiscoveryOpen, setIsDiscoveryOpen] = useState<boolean>(false);
   const [discoverySkill, setDiscoverySkill] = useState<string | null>(null);
+
+  // Stage 5C Personalized Learning Path State
+  const [isLearningPathOpen, setIsLearningPathOpen] = useState<boolean>(false);
+  const [learningPathSkill, setLearningPathSkill] = useState<string | null>(null);
+  const [learningPathResource, setLearningPathResource] = useState<DiscoveredResource | null>(null);
 
   const [initialChecking, setInitialChecking] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);

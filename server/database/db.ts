@@ -211,6 +211,58 @@ export function initDatabase() {
       verified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       expires_at TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS learning_paths (
+      id SERIAL PRIMARY KEY,
+      learner_id INTEGER REFERENCES learners(id) ON DELETE CASCADE,
+      target_competency VARCHAR(150) NOT NULL,
+      current_score INTEGER NOT NULL,
+      target_score INTEGER NOT NULL,
+      current_level VARCHAR(50) NOT NULL,
+      target_level VARCHAR(50) NOT NULL,
+      learning_goal TEXT NOT NULL,
+      role_name VARCHAR(150) NOT NULL,
+      assignment_name VARCHAR(200) NOT NULL,
+      resource_id VARCHAR(100),
+      resource_title VARCHAR(255) NOT NULL,
+      resource_url TEXT NOT NULL,
+      provider_name VARCHAR(150) NOT NULL,
+      resource_type VARCHAR(100) NOT NULL,
+      is_official_structure BOOLEAN DEFAULT FALSE,
+      structure_label VARCHAR(100) NOT NULL,
+      total_steps INTEGER NOT NULL DEFAULT 5,
+      future_skill_note TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS learning_path_steps (
+      id SERIAL PRIMARY KEY,
+      learning_path_id INTEGER REFERENCES learning_paths(id) ON DELETE CASCADE,
+      step_number INTEGER NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      purpose TEXT NOT NULL,
+      step_type VARCHAR(50) NOT NULL,
+      competency VARCHAR(150) NOT NULL,
+      estimated_effort VARCHAR(100),
+      prerequisite TEXT,
+      prerequisite_met BOOLEAN DEFAULT TRUE,
+      resource_url TEXT,
+      section_ref VARCHAR(150),
+      completion_condition TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS learner_path_step_progress (
+      id SERIAL PRIMARY KEY,
+      learner_id INTEGER REFERENCES learners(id) ON DELETE CASCADE,
+      learning_path_id INTEGER REFERENCES learning_paths(id) ON DELETE CASCADE,
+      step_id INTEGER REFERENCES learning_path_steps(id) ON DELETE CASCADE,
+      status VARCHAR(50) NOT NULL DEFAULT 'NOT_STARTED',
+      started_at TIMESTAMP,
+      completed_at TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Check if data already exists
@@ -389,11 +441,14 @@ export function getDbStatus() {
   const attemptsCount = pgInstance.public.many('SELECT COUNT(*) as count FROM assessment_attempts')[0];
   let materialsCount = 0;
   let quizzesCount = 0;
+  let pathsCount = 0;
   try {
     const m = pgInstance.public.many('SELECT COUNT(*) as count FROM learning_materials')[0];
     materialsCount = Number(m.count);
     const q = pgInstance.public.many('SELECT COUNT(*) as count FROM quizzes')[0];
     quizzesCount = Number(q.count);
+    const lp = pgInstance.public.many('SELECT COUNT(*) as count FROM learning_paths')[0];
+    pathsCount = Number(lp.count);
   } catch {}
 
   return {
@@ -405,6 +460,7 @@ export function getDbStatus() {
     attempts_count: Number(attemptsCount.count),
     materials_count: materialsCount,
     quizzes_count: quizzesCount,
+    learning_paths_count: pathsCount,
   };
 }
 

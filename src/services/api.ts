@@ -18,7 +18,9 @@ import type {
   RoleDefinition,
   FutureSkill,
   DiscoveryResponse,
-  DiscoveredResource
+  DiscoveredResource,
+  LearningPathDetail,
+  LearningPathSummary
 } from '../types/index.ts';
 
 const BASE_URL = '/api';
@@ -535,5 +537,171 @@ export async function searchLearningDiscovery(params: {
   }
   return result.data;
 }
+
+// ==========================================
+// STAGE 5C — Personalized Learning Path API
+// ==========================================
+
+/**
+ * Generates or retrieves a personalized, step-by-step learning path for an officer.
+ */
+export async function generateLearningPath(
+  learnerId: number,
+  skillGap: string,
+  resource?: DiscoveredResource | null,
+  resourceId?: string | number | null,
+  targetScore?: number,
+  forceNew: boolean = false
+): Promise<LearningPathDetail> {
+  const response = await fetch(`${BASE_URL}/learning-paths/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      learner_id: learnerId,
+      skill_gap: skillGap,
+      resource: resource || null,
+      resource_id: resourceId || null,
+      target_score: targetScore,
+      force_new: forceNew,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to build learning path (HTTP ${response.status})`);
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to build learning path');
+  }
+
+  return result.data;
+}
+
+/**
+ * Retrieves all learning paths for a learner.
+ */
+export async function getLearnerLearningPaths(learnerId: number): Promise<LearningPathSummary[]> {
+  const response = await fetch(`${BASE_URL}/learners/${learnerId}/learning-paths`);
+  if (!response.ok) {
+    throw new Error(`Failed to retrieve learner learning paths (HTTP ${response.status})`);
+  }
+
+  const result = await response.json();
+  return result.data || [];
+}
+
+/**
+ * Retrieves a specific learning path with step progress.
+ */
+export async function getLearningPathById(pathId: number, learnerId: number): Promise<LearningPathDetail> {
+  const response = await fetch(`${BASE_URL}/learning-paths/${pathId}?learner_id=${learnerId}`);
+  if (!response.ok) {
+    throw new Error(`Failed to retrieve learning path (HTTP ${response.status})`);
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Learning path not found');
+  }
+
+  return result.data;
+}
+
+/**
+ * Marks a step as IN_PROGRESS.
+ */
+export async function startLearningPathStep(
+  pathId: number,
+  stepId: number,
+  learnerId: number
+): Promise<LearningPathDetail> {
+  const response = await fetch(`${BASE_URL}/learning-paths/${pathId}/steps/${stepId}/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ learner_id: learnerId }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to start learning step (HTTP ${response.status})`);
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Marks a step as COMPLETED, recording timestamp and unlocking the next step.
+ */
+export async function completeLearningPathStep(
+  pathId: number,
+  stepId: number,
+  learnerId: number
+): Promise<LearningPathDetail> {
+  const response = await fetch(`${BASE_URL}/learning-paths/${pathId}/steps/${stepId}/complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ learner_id: learnerId }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to complete learning step (HTTP ${response.status})`);
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Retrieves strong alternative verified resources for this path.
+ */
+export async function getLearningPathAlternatives(
+  pathId: number,
+  learnerId: number
+): Promise<DiscoveredResource[]> {
+  const response = await fetch(`${BASE_URL}/learning-paths/${pathId}/alternatives?learner_id=${learnerId}`);
+  if (!response.ok) {
+    throw new Error(`Failed to retrieve path alternatives (HTTP ${response.status})`);
+  }
+
+  const result = await response.json();
+  return result.data || [];
+}
+
+/**
+ * Switches the primary resource for an existing path.
+ */
+export async function switchLearningPathResource(
+  pathId: number,
+  learnerId: number,
+  newResource: DiscoveredResource
+): Promise<LearningPathDetail> {
+  const response = await fetch(`${BASE_URL}/learning-paths/${pathId}/switch-resource`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ learner_id: learnerId, new_resource: newResource }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to switch resource (HTTP ${response.status})`);
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Retrieves or generates grounded practice quiz for this learning path.
+ */
+export async function getLearningPathQuiz(pathId: number, learnerId: number): Promise<any> {
+  const response = await fetch(`${BASE_URL}/learning-paths/${pathId}/quiz?learner_id=${learnerId}`);
+  if (!response.ok) {
+    throw new Error(`Failed to retrieve practice quiz (HTTP ${response.status})`);
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
 
 
