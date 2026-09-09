@@ -1,12 +1,8 @@
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import learnerRoutes from './server/routes/learnerRoutes.ts';
 import { initDatabase } from './server/database/db.ts';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();

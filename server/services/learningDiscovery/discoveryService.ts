@@ -263,4 +263,17 @@ export class LearningDiscoveryService {
 
     return response;
   }
+
+  /**
+   * Alias method for discovering learning resources for a learner
+   */
+  public static async discover(
+    learnerId: number,
+    skillGapName?: string,
+    forceRefresh: boolean = false
+  ): Promise<DiscoveryResponse> {
+    return this.discoverForLearner(learnerId, skillGapName, forceRefresh);
+  }
 }
+
+export { LearningDiscoveryService as DiscoveryService };

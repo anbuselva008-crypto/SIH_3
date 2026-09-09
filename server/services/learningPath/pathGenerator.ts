@@ -66,7 +66,8 @@ export class PathGenerator {
     const learningGoal = this.buildLearningObjective(learner, targetCompetency);
 
     // 3. Inspect Previous Training to avoid unnecessary duplication
-    const previousTrainings = (learner.previous_trainings || []).map((t) => t.toLowerCase());
+    const rawTrainings = learner.previous_trainings || (typeof learner.previous_training === 'string' ? [learner.previous_training] : learner.previous_training) || [];
+    const previousTrainings = (Array.isArray(rawTrainings) ? rawTrainings : [rawTrainings]).map((t) => String(t).toLowerCase());
     const hasBasicProcurement = previousTrainings.some((t) => t.includes('procurement'));
     const hasBasicPython = previousTrainings.some((t) => t.includes('python'));
     const hasBasicStatistics = previousTrainings.some((t) => t.includes('statistic') || t.includes('survey'));
@@ -196,7 +197,7 @@ export class PathGenerator {
     if (titleLower.includes('structural dynamics') || titleLower.includes('finite element')) {
       const isMet = learner.educational_qualification?.toLowerCase().includes('civil') ||
                     currentScore >= 65 ||
-                    allCompetencies.some((c) => c.competency_name.toLowerCase().includes('mechanics') && c.current_score >= 60);
+                    allCompetencies.some((c) => (c.name || c.competency_name || '').toLowerCase().includes('mechanics') && (c.score ?? c.current_score ?? 0) >= 60);
       return {
         hasPrerequisite: true,
         prerequisiteName: 'Matrix Structural Analysis & Mechanics of Materials',
@@ -209,7 +210,8 @@ export class PathGenerator {
 
     // 2. Python Data Analysis
     if (compLower.includes('python') || titleLower.includes('python for data')) {
-      const priorTrainings = (learner.previous_trainings || []).map((t) => t.toLowerCase());
+      const rawTrainings = learner.previous_trainings || (typeof learner.previous_training === 'string' ? [learner.previous_training] : learner.previous_training) || [];
+      const priorTrainings = (Array.isArray(rawTrainings) ? rawTrainings : [rawTrainings]).map((t) => String(t).toLowerCase());
       const hasPrior = priorTrainings.some((t) => t.includes('python') || t.includes('computing'));
       const isMet = currentScore >= 40 || hasPrior;
       return {

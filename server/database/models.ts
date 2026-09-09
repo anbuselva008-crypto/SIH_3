@@ -11,22 +11,29 @@ export interface Learner {
   educational_qualification?: string;
   years_of_experience?: number;
   previous_training?: string;
+  previous_trainings?: string[];
   language_preference?: string;
   profile_completed: boolean;
   is_demo: boolean;
   created_at?: string;
 }
 
+export type LearnerProfile = Learner;
+
 export interface Competency {
   id: number;
   learner_id: number;
   name: string;
+  competency_name?: string;
   score: number;
+  current_score?: number;
   max_score: number;
   category: string;
   benchmark_target: number;
   created_at?: string;
 }
+
+export type CompetencyItem = Competency;
 
 export interface LearnerResponse extends Learner {
   overall_score: number;

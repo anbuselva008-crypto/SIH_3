@@ -23,7 +23,8 @@ import {
   getSkillGapReport, 
   getRecommendations, 
   getLearningResources, 
-  resetBaseline 
+  resetBaseline,
+  getLearnerQuizzes
 } from './services/api.ts';
 import type { 
   LearnerProfile, 
@@ -240,6 +241,12 @@ export default function App() {
     setIsDiscoveryOpen(true);
   };
 
+  const handleOpenLearningPath = (skillName: string, resource?: DiscoveredResource | null) => {
+    setLearningPathSkill(skillName);
+    setLearningPathResource(resource || null);
+    setIsLearningPathOpen(true);
+  };
+
   // Initial session restoration state
   if (initialChecking) {
     return (
@@ -405,6 +412,7 @@ export default function App() {
               loading={loading}
               onStartAssessment={handleOpenAssessment}
               onFindResources={(skillName) => handleOpenDiscovery(skillName)}
+              onBuildLearningPath={(skillName) => handleOpenLearningPath(skillName)}
             />
 
             {/* 4. YOUR NEXT LEARNING STEP */}
@@ -419,6 +427,7 @@ export default function App() {
                 setSelectedResourceFallback(null);
               }}
               onDiscoverResources={(skillName) => handleOpenDiscovery(skillName)}
+              onBuildLearningPath={(skillName) => handleOpenLearningPath(skillName)}
             />
 
             {/* 5. OTHER RECOMMENDATIONS & COURSE CATALOGUE */}
@@ -436,6 +445,7 @@ export default function App() {
               }}
               onRegenerate={handleRegenerateRecommendations}
               onOpenDiscovery={(skillName) => handleOpenDiscovery(skillName)}
+              onBuildLearningPath={(skillName) => handleOpenLearningPath(skillName)}
             />
           </>
         )}
@@ -448,6 +458,31 @@ export default function App() {
         onClose={() => setSelectedCompetency(null)}
       />
 
+      {/* Stage 5C Personalized Learning Path Modal */}
+      {isLearningPathOpen && learner && (
+        <LearningPathModal
+          skillGap={learningPathSkill || 'Survey Methodology'}
+          learnerId={learner.id}
+          initialResource={learningPathResource}
+          language={language}
+          onClose={() => {
+            setIsLearningPathOpen(false);
+            setLearningPathSkill(null);
+            setLearningPathResource(null);
+          }}
+          onOpenQuizModal={(quizId) => {
+            getLearnerQuizzes(learner.id)
+              .then((quizzes) => {
+                const found = quizzes.find((q) => q.id === quizId);
+                if (found) {
+                  setActiveDirectQuiz(found);
+                }
+              })
+              .catch(console.error);
+          }}
+        />
+      )}
+
       {/* Stage 5A Intelligent Learning Resource Discovery Modal */}
       {isDiscoveryOpen && learner && (
         <LearningDiscoveryModal
@@ -457,6 +492,10 @@ export default function App() {
           onClose={() => {
             setIsDiscoveryOpen(false);
             setDiscoverySkill(null);
+          }}
+          onBuildLearningPath={(res) => {
+            setIsDiscoveryOpen(false);
+            handleOpenLearningPath(discoverySkill || res.primary_competency || 'Survey Methodology', res);
           }}
           onViewResourceDetails={(resItem) => {
             const matchedCatalogue = allCatalogue.find(

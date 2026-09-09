@@ -24,6 +24,7 @@ interface RecommendationsSectionProps {
   onViewResource: (res: LearningResource) => void;
   onRegenerate?: () => void;
   onOpenDiscovery?: (skill?: string) => void;
+  onBuildLearningPath?: (skill: string) => void;
 }
 
 export default function RecommendationsSection({
@@ -34,6 +35,7 @@ export default function RecommendationsSection({
   onViewResource,
   onRegenerate,
   onOpenDiscovery,
+  onBuildLearningPath,
 }: RecommendationsSectionProps) {
   const [activeTab, setActiveTab] = useState<'high' | 'recommended' | 'optional' | 'all'>('high');
   const [searchQuery, setSearchQuery] = useState('');
@@ -198,6 +200,7 @@ export default function RecommendationsSection({
                   key={item.id}
                   item={item}
                   onViewDetails={() => onViewDetails(item)}
+                  onBuildLearningPath={onBuildLearningPath}
                 />
               ))}
             </div>
@@ -221,6 +224,7 @@ export default function RecommendationsSection({
                   key={item.id}
                   item={item}
                   onViewDetails={() => onViewDetails(item)}
+                  onBuildLearningPath={onBuildLearningPath}
                 />
               ))}
             </div>
@@ -244,6 +248,7 @@ export default function RecommendationsSection({
                   key={item.id}
                   item={item}
                   onViewDetails={() => onViewDetails(item)}
+                  onBuildLearningPath={onBuildLearningPath}
                 />
               ))}
             </div>
@@ -297,6 +302,7 @@ export default function RecommendationsSection({
 interface RecommendationCardProps {
   item: RecommendationItem;
   onViewDetails: () => void;
+  onBuildLearningPath?: (skill: string) => void;
   key?: string | number;
 }
 
@@ -306,6 +312,7 @@ interface RecommendationCardProps {
 function RecommendationCard({
   item,
   onViewDetails,
+  onBuildLearningPath,
 }: RecommendationCardProps) {
   const { resource } = item;
   const isIGOT = resource.source === 'iGOT';
@@ -360,17 +367,27 @@ function RecommendationCard({
       </div>
 
       {/* Action CTA */}
-      <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+      <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
         <div className="text-xs text-slate-500">
           Match: <strong className="text-slate-900">{item.recommendation_score}%</strong>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {onBuildLearningPath && (
+            <button
+              onClick={() => onBuildLearningPath(resource.competency)}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+              title="Personalized Learning Path"
+            >
+              <Compass className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Path</span>
+            </button>
+          )}
           <button
             onClick={onViewDetails}
             className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50/70 hover:bg-blue-100/70 px-2.5 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>Practice with AI Quiz</span>
+            <span>Practice</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>

@@ -32,9 +32,9 @@ export class LearningPathService {
       `SELECT * FROM competencies WHERE learner_id = ${learnerId}`
     );
     const targetComp = allCompetencies.find(
-      (c) => c.competency_name.toLowerCase() === skillGap.toLowerCase()
+      (c) => (c.name || c.competency_name || '').toLowerCase() === skillGap.toLowerCase()
     );
-    const currentScore = targetComp ? targetComp.current_score : 30;
+    const currentScore = targetComp ? (targetComp.score ?? targetComp.current_score ?? 30) : 30;
 
     // 3. If not forceNew, check if an existing learning path exists
     if (!forceNew) {
@@ -72,14 +72,16 @@ export class LearningPathService {
         id: `res-${Date.now()}`,
         title: `${skillGap} Principles & Official Training`,
         url: 'https://igotkarmayogi.gov.in',
+        canonical_url: 'https://igotkarmayogi.gov.in',
         provider_name: 'iGOT Karmayogi / NSSTA',
+        provider_type: 'Government',
         source_tier: 1,
         description: `National training programme addressing ${skillGap} for government officials.`,
         primary_competency: skillGap,
         secondary_competencies: [],
         relevant_job_families: [],
         relevant_roles: [learner.role],
-        relevant_assignments: [learner.current_assignment],
+        relevant_assignments: learner.current_assignment ? [learner.current_assignment] : [],
         difficulty: 'Beginner',
         language: 'English',
         estimated_duration: '4 weeks',

@@ -165,6 +165,13 @@ export class QuizService {
   }
 
   /**
+   * Alias for retrieving a quiz with questions.
+   */
+  public static async getQuizWithQuestions(id: number): Promise<Quiz> {
+    return this.getQuizById(id);
+  }
+
+  /**
    * Submits learner quiz attempt and records answers and score evidence.
    * NOTE: Does NOT overwrite baseline Stage 2 diagnostic scores.
    */
