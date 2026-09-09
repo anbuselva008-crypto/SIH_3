@@ -263,6 +263,113 @@ export function initDatabase() {
       completed_at TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS learner_schedule_preferences (
+      id SERIAL PRIMARY KEY,
+      learner_id INTEGER REFERENCES learners(id) ON DELETE CASCADE UNIQUE,
+      availability_mode VARCHAR(50) NOT NULL DEFAULT '30_min_day',
+      minutes_per_session INTEGER NOT NULL DEFAULT 30,
+      weekly_minutes_target INTEGER NOT NULL DEFAULT 120,
+      preferred_days TEXT NOT NULL DEFAULT 'Monday,Wednesday,Friday,Sunday',
+      preferred_period VARCHAR(50) NOT NULL DEFAULT 'Evening',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS weekly_learning_plans (
+      id SERIAL PRIMARY KEY,
+      learner_id INTEGER REFERENCES learners(id) ON DELETE CASCADE,
+      learning_path_id INTEGER REFERENCES learning_paths(id) ON DELETE CASCADE,
+      week_number INTEGER NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+      focus_topic VARCHAR(255) NOT NULL,
+      why_this_matters TEXT NOT NULL,
+      adaptation_reason TEXT,
+      learning_goal TEXT NOT NULL,
+      total_planned_minutes INTEGER NOT NULL DEFAULT 120,
+      completed_minutes INTEGER NOT NULL DEFAULT 0,
+      momentum_status VARCHAR(50) NOT NULL DEFAULT 'On Track',
+      week_start DATE,
+      week_end DATE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS weekly_learning_items (
+      id SERIAL PRIMARY KEY,
+      weekly_plan_id INTEGER REFERENCES weekly_learning_plans(id) ON DELETE CASCADE,
+      day_of_week VARCHAR(50) NOT NULL,
+      sequence_order INTEGER NOT NULL DEFAULT 1,
+      title VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      activity_type VARCHAR(50) NOT NULL,
+      estimated_minutes INTEGER NOT NULL DEFAULT 30,
+      topic_tag VARCHAR(150) NOT NULL,
+      resource_url TEXT,
+      is_completed BOOLEAN NOT NULL DEFAULT FALSE,
+      completed_at TIMESTAMP,
+      is_carried_forward BOOLEAN NOT NULL DEFAULT FALSE,
+      priority_level VARCHAR(20) NOT NULL DEFAULT 'NORMAL',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS weekly_checkpoints (
+      id SERIAL PRIMARY KEY,
+      weekly_plan_id INTEGER REFERENCES weekly_learning_plans(id) ON DELETE CASCADE,
+      learner_id INTEGER REFERENCES learners(id) ON DELETE CASCADE,
+      learning_path_id INTEGER REFERENCES learning_paths(id) ON DELETE CASCADE,
+      week_number INTEGER NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      total_questions INTEGER NOT NULL DEFAULT 5,
+      passing_score INTEGER NOT NULL DEFAULT 60,
+      competency_name VARCHAR(150) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS weekly_checkpoint_questions (
+      id SERIAL PRIMARY KEY,
+      checkpoint_id INTEGER REFERENCES weekly_checkpoints(id) ON DELETE CASCADE,
+      question_number INTEGER NOT NULL,
+      question_text TEXT NOT NULL,
+      option_a TEXT NOT NULL,
+      option_b TEXT NOT NULL,
+      option_c TEXT NOT NULL,
+      option_d TEXT NOT NULL,
+      correct_option INTEGER NOT NULL,
+      explanation TEXT NOT NULL,
+      topic_tag VARCHAR(150) NOT NULL,
+      difficulty VARCHAR(50) NOT NULL DEFAULT 'Medium',
+      source_reference TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS weekly_checkpoint_results (
+      id SERIAL PRIMARY KEY,
+      checkpoint_id INTEGER REFERENCES weekly_checkpoints(id) ON DELETE CASCADE,
+      weekly_plan_id INTEGER REFERENCES weekly_learning_plans(id) ON DELETE CASCADE,
+      learner_id INTEGER REFERENCES learners(id) ON DELETE CASCADE,
+      total_questions INTEGER NOT NULL,
+      correct_count INTEGER NOT NULL,
+      score_percentage INTEGER NOT NULL,
+      progress_rating VARCHAR(50) NOT NULL,
+      strong_topics TEXT NOT NULL,
+      weak_topics TEXT NOT NULL,
+      improvement_analysis TEXT NOT NULL,
+      next_week_recommendation TEXT NOT NULL,
+      answers_summary TEXT NOT NULL,
+      completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS weekly_topic_performance (
+      id SERIAL PRIMARY KEY,
+      learner_id INTEGER REFERENCES learners(id) ON DELETE CASCADE,
+      weekly_plan_id INTEGER REFERENCES weekly_learning_plans(id) ON DELETE CASCADE,
+      topic_name VARCHAR(150) NOT NULL,
+      mastery_percentage INTEGER NOT NULL,
+      status VARCHAR(50) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Check if data already exists
@@ -365,6 +472,12 @@ export function seedBaselineData() {
     (1, 'Python', 40, 100, 'Programming & Computing', 60),
     (1, 'Data Analysis', 55, 100, 'Applied Analysis', 70),
     (1, 'Data Visualization', 80, 100, 'Reporting & Dissemination', 75);
+
+    INSERT INTO learner_schedule_preferences 
+    (learner_id, availability_mode, minutes_per_session, weekly_minutes_target, preferred_days, preferred_period)
+    VALUES
+    (1, '30_min_day', 30, 120, 'Monday,Wednesday,Friday,Sunday', 'Evening')
+    ON CONFLICT (learner_id) DO NOTHING;
   `);
 }
 

@@ -11,6 +11,8 @@ import RecommendationsSection from './components/RecommendationsSection.tsx';
 import CourseDetailModal from './components/CourseDetailModal.tsx';
 import LearningDiscoveryModal from './components/LearningDiscoveryModal.tsx';
 import LearningPathModal from './components/LearningPathModal.tsx';
+import WeeklyPlanModal from './components/WeeklyPlanModal.tsx';
+import WeeklyLearningPlanCard from './components/WeeklyLearningPlanCard.tsx';
 import AIQuizModal from './components/AIQuizModal.tsx';
 import UploadMaterialModal from './components/UploadMaterialModal.tsx';
 import ApiStatusBadge from './components/ApiStatusBadge.tsx';
@@ -67,6 +69,10 @@ export default function App() {
   const [isLearningPathOpen, setIsLearningPathOpen] = useState<boolean>(false);
   const [learningPathSkill, setLearningPathSkill] = useState<string | null>(null);
   const [learningPathResource, setLearningPathResource] = useState<DiscoveredResource | null>(null);
+
+  // Stage 5D Adaptive Weekly Learning Plan & Coach State
+  const [isWeeklyPlanOpen, setIsWeeklyPlanOpen] = useState<boolean>(false);
+  const [weeklyPlanPathId, setWeeklyPlanPathId] = useState<number | null>(null);
 
   const [initialChecking, setInitialChecking] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
@@ -245,6 +251,13 @@ export default function App() {
     setLearningPathSkill(skillName);
     setLearningPathResource(resource || null);
     setIsLearningPathOpen(true);
+  };
+
+  const handleOpenWeeklyPlan = (pathId?: number) => {
+    if (pathId) {
+      setWeeklyPlanPathId(pathId);
+    }
+    setIsWeeklyPlanOpen(true);
   };
 
   // Initial session restoration state
@@ -430,6 +443,14 @@ export default function App() {
               onBuildLearningPath={(skillName) => handleOpenLearningPath(skillName)}
             />
 
+            {/* 4.5. YOUR ADAPTIVE WEEKLY LEARNING PLAN & PROGRESS COACH (Stage 5D) */}
+            <WeeklyLearningPlanCard
+              learningPathId={weeklyPlanPathId}
+              learnerId={learner.id}
+              language={language}
+              onOpenWeeklyPlan={handleOpenWeeklyPlan}
+            />
+
             {/* 5. OTHER RECOMMENDATIONS & COURSE CATALOGUE */}
             <RecommendationsSection
               recommendations={recommendations}
@@ -566,6 +587,16 @@ export default function App() {
             setNotification('AI Practice Quiz assessment evaluated. Diagnostic baseline records preserved.');
             setTimeout(() => setNotification(null), 6000);
           }}
+        />
+      )}
+
+      {/* Stage 5D Adaptive Weekly Learning Plan & Coach Modal */}
+      {isWeeklyPlanOpen && learner && (
+        <WeeklyPlanModal
+          learningPathId={weeklyPlanPathId}
+          learnerId={learner.id}
+          language={language}
+          onClose={() => setIsWeeklyPlanOpen(false)}
         />
       )}
 

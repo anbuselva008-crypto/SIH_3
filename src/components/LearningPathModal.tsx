@@ -20,7 +20,9 @@ import {
   FileCheck,
   ShieldCheck,
   Zap,
+  Calendar,
 } from 'lucide-react';
+import WeeklyPlanModal from './WeeklyPlanModal.tsx';
 import type {
   LearningPathDetail,
   LearningPathStepItem,
@@ -78,6 +80,7 @@ export default function LearningPathModal({
   const [selectedQuizAnswers, setSelectedQuizAnswers] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState<boolean>(false);
   const [quizScore, setQuizScore] = useState<number | null>(null);
+  const [showWeeklyPlan, setShowWeeklyPlan] = useState<boolean>(false);
 
   // Fetch or generate learning path on mount
   useEffect(() => {
@@ -434,6 +437,21 @@ export default function LearningPathModal({
                     className="h-full bg-gradient-to-r from-blue-400 to-emerald-400 rounded-full transition-all duration-500 ease-out"
                     style={{ width: `${path.progress_percentage}%` }}
                   />
+                </div>
+
+                <div className="pt-2 flex items-center justify-between gap-3 border-t border-blue-800/40">
+                  <span className="text-xs text-blue-200">
+                    Want an actionable, schedule-calibrated weekly study plan?
+                  </span>
+                  <button
+                    id="open-weekly-plan-from-path-btn"
+                    type="button"
+                    onClick={() => setShowWeeklyPlan(true)}
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 flex items-center gap-1.5 transition-colors shadow-xs shrink-0"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Weekly Plan & Coach</span>
+                  </button>
                 </div>
               </div>
 
@@ -868,6 +886,16 @@ export default function LearningPathModal({
             </div>
           </div>
         </div>
+      )}
+      {/* Stage 5D Adaptive Weekly Plan Modal */}
+      {showWeeklyPlan && path && (
+        <WeeklyPlanModal
+          learningPathId={path.id}
+          learnerId={learnerId}
+          language={language}
+          onClose={() => setShowWeeklyPlan(false)}
+          onOpenPracticeQuiz={onOpenQuizModal}
+        />
       )}
     </div>
   );

@@ -20,7 +20,13 @@ import type {
   DiscoveryResponse,
   DiscoveredResource,
   LearningPathDetail,
-  LearningPathSummary
+  LearningPathSummary,
+  LearnerSchedulePreferences,
+  WeeklyPlanWithItems,
+  WeeklyCheckpointQuestion,
+  WeeklyCheckpointResult,
+  SchedulePreferencesInput,
+  PlanAdjustmentInput
 } from '../types/index.ts';
 
 const BASE_URL = '/api';
@@ -702,6 +708,202 @@ export async function getLearningPathQuiz(pathId: number, learnerId: number): Pr
   const result = await response.json();
   return result.data;
 }
+
+// ==========================================
+// STAGE 5D — Adaptive Weekly Learning Plan API
+// ==========================================
+
+/**
+ * Retrieves officer's schedule preferences.
+ */
+export async function getSchedulePreferences(learnerId: number): Promise<LearnerSchedulePreferences> {
+  const response = await fetch(`${BASE_URL}/learners/${learnerId}/schedule-preferences`);
+  if (!response.ok) {
+    throw new Error(`Failed to retrieve schedule preferences (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Updates officer's schedule preferences.
+ */
+export async function updateSchedulePreferences(
+  learnerId: number,
+  preferences: SchedulePreferencesInput
+): Promise<LearnerSchedulePreferences> {
+  const response = await fetch(`${BASE_URL}/learners/${learnerId}/schedule-preferences`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(preferences),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to update schedule preferences (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Generates or activates the active weekly learning plan for a path.
+ */
+export async function generateWeeklyPlan(
+  pathId: number,
+  learnerId: number,
+  forceGenerate: boolean = false
+): Promise<WeeklyPlanWithItems> {
+  const response = await fetch(`${BASE_URL}/learning-paths/${pathId}/weekly-plan/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ learner_id: learnerId, force_generate: forceGenerate }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to generate weekly plan (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Retrieves the current active weekly learning plan.
+ */
+export async function getCurrentWeeklyPlan(pathId: number, learnerId: number): Promise<WeeklyPlanWithItems> {
+  const response = await fetch(`${BASE_URL}/learning-paths/${pathId}/weekly-plan/current?learner_id=${learnerId}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch current weekly plan (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Retrieves all weekly plans history for a learning path.
+ */
+export async function getWeeklyPlanHistory(pathId: number, learnerId: number): Promise<WeeklyPlanWithItems[]> {
+  const response = await fetch(`${BASE_URL}/learning-paths/${pathId}/weekly-plan/history?learner_id=${learnerId}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch weekly plan history (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Toggles or completes an activity in the weekly plan.
+ */
+export async function toggleWeeklyItem(
+  planId: number,
+  itemId: number,
+  learnerId: number
+): Promise<WeeklyPlanWithItems> {
+  const response = await fetch(`${BASE_URL}/weekly-plans/${planId}/items/${itemId}/toggle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ learner_id: learnerId }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to update weekly item (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Starts the weekly checkpoint (fetches 5 questions).
+ */
+export async function startWeeklyCheckpoint(
+  planId: number,
+  learnerId: number
+): Promise<{
+  checkpoint: any;
+  questions: WeeklyCheckpointQuestion[];
+  result: WeeklyCheckpointResult | null;
+}> {
+  const response = await fetch(`${BASE_URL}/weekly-plans/${planId}/checkpoint/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ learner_id: learnerId }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to start weekly checkpoint (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Submits answers for the weekly checkpoint and triggers adaptive evaluation.
+ */
+export async function submitWeeklyCheckpoint(
+  planId: number,
+  learnerId: number,
+  answers: Record<number, number>
+): Promise<WeeklyCheckpointResult> {
+  const response = await fetch(`${BASE_URL}/weekly-plans/${planId}/checkpoint/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ learner_id: learnerId, answers }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to submit weekly checkpoint (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Generates an adaptive next-week plan based on checkpoint evidence and progress.
+ */
+export async function generateNextWeekPlan(
+  planId: number,
+  learnerId: number
+): Promise<WeeklyPlanWithItems> {
+  const response = await fetch(`${BASE_URL}/weekly-plans/${planId}/generate-next-week`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ learner_id: learnerId }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to generate next week plan (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Adjusts weekly plan dynamically based on officer availability or feedback.
+ */
+export async function adjustWeeklyPlan(
+  planId: number,
+  learnerId: number,
+  input: PlanAdjustmentInput
+): Promise<WeeklyPlanWithItems> {
+  const response = await fetch(`${BASE_URL}/weekly-plans/${planId}/adjust`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ learner_id: learnerId, ...input }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to adjust weekly plan (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Retrieves the latest active weekly plan for a learner across all learning paths.
+ */
+export async function getLatestWeeklyPlanForLearner(
+  learnerId: number
+): Promise<WeeklyPlanWithItems | null> {
+  const response = await fetch(`${BASE_URL}/learners/${learnerId}/weekly-plan/latest`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch latest weekly plan (HTTP ${response.status})`);
+  }
+  const result = await response.json();
+  return result.data || null;
+}
+
 
 
 

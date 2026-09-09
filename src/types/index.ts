@@ -535,6 +535,146 @@ export interface LearningPathSummary {
   updated_at?: string;
 }
 
+// ==========================================
+// STAGE 5D — Adaptive Weekly Learning Plan Types
+// ==========================================
+
+export type AvailabilityMode = 
+  | '15_min_day'
+  | '30_min_day'
+  | '45_min_day'
+  | '60_min_day'
+  | '2_3_hrs_week'
+  | '5_plus_hrs_week'
+  | 'custom';
+
+export type PreferredPeriod = 'Morning' | 'Afternoon' | 'Evening' | 'Custom';
+export type WeeklyActivityType = 'LEARN' | 'PRACTICE' | 'REVIEW' | 'CHECK' | 'REFLECT';
+export type WeeklyPlanStatus = 'ACTIVE' | 'COMPLETED' | 'ADAPTED' | 'PAST';
+export type MomentumStatus = 'On Track' | 'Steady' | 'Needs Attention';
+
+export interface LearnerSchedulePreferences {
+  id: number;
+  learner_id: number;
+  availability_mode: AvailabilityMode;
+  minutes_per_session: number;
+  weekly_minutes_target: number;
+  preferred_days: string;
+  preferred_period: PreferredPeriod;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WeeklyLearningPlan {
+  id: number;
+  learner_id: number;
+  learning_path_id: number;
+  week_number: number;
+  version: number;
+  status: WeeklyPlanStatus;
+  focus_topic: string;
+  why_this_matters: string;
+  adaptation_reason?: string | null;
+  learning_goal: string;
+  total_planned_minutes: number;
+  completed_minutes: number;
+  momentum_status: MomentumStatus;
+  week_start?: string | null;
+  week_end?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WeeklyLearningItem {
+  id: number;
+  weekly_plan_id: number;
+  day_of_week: string;
+  sequence_order: number;
+  title: string;
+  description: string;
+  activity_type: WeeklyActivityType;
+  estimated_minutes: number;
+  topic_tag: string;
+  resource_url?: string | null;
+  is_completed: boolean;
+  completed_at?: string | null;
+  is_carried_forward: boolean;
+  priority_level: 'NORMAL' | 'HIGH' | 'REINFORCEMENT';
+  created_at?: string;
+}
+
+export interface WeeklyCheckpoint {
+  id: number;
+  weekly_plan_id: number;
+  learner_id: number;
+  learning_path_id: number;
+  week_number: number;
+  title: string;
+  total_questions: number;
+  passing_score: number;
+  competency_name: string;
+  created_at?: string;
+}
+
+export interface WeeklyCheckpointQuestion {
+  id: number;
+  checkpoint_id: number;
+  question_number: number;
+  question_text: string;
+  options: string[];
+  correct_option: number;
+  explanation: string;
+  topic_tag: string;
+  difficulty: string;
+  source_reference?: string | null;
+  created_at?: string;
+}
+
+export interface WeeklyCheckpointResult {
+  id: number;
+  checkpoint_id: number;
+  weekly_plan_id: number;
+  learner_id: number;
+  total_questions: number;
+  correct_count: number;
+  score_percentage: number;
+  progress_rating: 'Excellent' | 'Good' | 'Developing' | 'Needs Attention';
+  strong_topics: string[];
+  weak_topics: string[];
+  improvement_analysis: string;
+  next_week_recommendation: string;
+  answers_summary: Record<string, any>;
+  completed_at?: string;
+}
+
+export interface WeeklyPlanWithItems extends WeeklyLearningPlan {
+  items: WeeklyLearningItem[];
+  checkpoint?: WeeklyCheckpoint | null;
+  latest_result?: WeeklyCheckpointResult | null;
+  is_checkpoint_completed: boolean;
+  completion_percentage: number;
+  schedule_summary?: {
+    preferred_days: string[];
+    minutes_per_session: number;
+    weekly_minutes_target: number;
+    preferred_period: string;
+  };
+}
+
+export interface SchedulePreferencesInput {
+  availability_mode?: AvailabilityMode;
+  minutes_per_session?: number;
+  weekly_minutes_target?: number;
+  preferred_days?: string[];
+  preferred_period?: PreferredPeriod;
+}
+
+export interface PlanAdjustmentInput {
+  adjustment_type: 'less_time' | 'more_time' | 'need_practice' | 'already_know';
+  reason?: string;
+}
+
+
 
 
 

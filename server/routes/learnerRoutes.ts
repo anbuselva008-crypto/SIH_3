@@ -8,6 +8,7 @@ import { DomainPackService } from '../services/domainPackService.ts';
 import { LearningDiscoveryService } from '../services/learningDiscovery/discoveryService.ts';
 import { VerificationService } from '../services/learningDiscovery/verificationService.ts';
 import { LearningPathService } from '../services/learningPath/learningPathService.ts';
+import { AdaptiveLearningPlannerService } from '../services/weeklyPlanner/adaptivePlannerService.ts';
 import { getActiveAIProvider } from '../services/aiProvider.ts';
 import { getDbStatus } from '../database/db.ts';
 
@@ -1260,9 +1261,332 @@ router.get('/learning-paths/:id/quiz', async (req: Request, res: Response) => {
       data: quiz,
     });
   } catch (error) {
+    console.error('Error fetching learning path quiz:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to retrieve practice quiz',
+      error: error instanceof Error ? error.message : 'Failed to retrieve learning path quiz',
+    });
+  }
+});
+
+// ==========================================
+// STAGE 5D — Adaptive Weekly Learning Plan Routes
+// ==========================================
+
+/**
+ * GET /api/learners/:id/schedule-preferences or /api/learners/me/schedule-preferences
+ * Retrieves schedule availability preferences for an officer.
+ */
+router.get(['/learners/:id/schedule-preferences', '/learners/me/schedule-preferences'], async (req: Request, res: Response) => {
+  try {
+    const rawId = req.params.id === 'me' ? null : req.params.id;
+    const queryId = req.query.learner_id || req.query.id;
+    const learnerId = rawId ? parseInt(rawId, 10) : queryId ? parseInt(queryId as string, 10) : 1;
+
+    const preferences = await AdaptiveLearningPlannerService.getSchedulePreferences(learnerId);
+    return res.json({
+      success: true,
+      data: preferences,
+    });
+  } catch (error) {
+    console.error('Error fetching schedule preferences:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch schedule preferences',
+    });
+  }
+});
+
+/**
+ * PUT /api/learners/:id/schedule-preferences or /api/learners/me/schedule-preferences
+ * Updates availability mode, session minutes, study days, and study period.
+ */
+router.put(['/learners/:id/schedule-preferences', '/learners/me/schedule-preferences'], async (req: Request, res: Response) => {
+  try {
+    const rawId = req.params.id === 'me' ? null : req.params.id;
+    const queryId = req.body.learner_id || req.query.learner_id;
+    const learnerId = rawId ? parseInt(rawId, 10) : queryId ? parseInt(queryId as string, 10) : 1;
+
+    const updated = await AdaptiveLearningPlannerService.saveSchedulePreferences(learnerId, req.body);
+    return res.json({
+      success: true,
+      message: 'Schedule preferences updated successfully.',
+      data: updated,
+    });
+  } catch (error) {
+    console.error('Error saving schedule preferences:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to save schedule preferences',
+    });
+  }
+});
+
+/**
+ * GET /api/learners/:id/weekly-plan/latest
+ * Retrieves the latest or active weekly learning plan for this learner across all paths.
+ */
+router.get('/learners/:id/weekly-plan/latest', async (req: Request, res: Response) => {
+  try {
+    const learnerId = parseInt(req.params.id, 10);
+    const plan = await AdaptiveLearningPlannerService.getLatestWeeklyPlanForLearner(learnerId);
+    return res.json({
+      success: true,
+      data: plan,
+    });
+  } catch (error) {
+    console.error('Error fetching latest weekly plan for learner:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to retrieve latest weekly plan',
+    });
+  }
+});
+
+/**
+ * POST /api/learning-paths/:id/weekly-plan/generate
+ * Generates or activates a weekly learning plan for the specified learning path.
+ */
+router.post('/learning-paths/:id/weekly-plan/generate', async (req: Request, res: Response) => {
+  try {
+    const pathId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.body.learnerId || req.query.learner_id;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+    const forceGenerate = Boolean(req.body.force_generate || req.body.forceNew);
+
+    const plan = await AdaptiveLearningPlannerService.getActiveWeeklyPlan(pathId, learnerId, forceGenerate);
+    return res.json({
+      success: true,
+      data: plan,
+    });
+  } catch (error) {
+    console.error('Error generating weekly plan:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate weekly plan',
+    });
+  }
+});
+
+/**
+ * GET /api/learning-paths/:id/weekly-plan/current
+ * Retrieves the current active weekly learning plan.
+ */
+router.get('/learning-paths/:id/weekly-plan/current', async (req: Request, res: Response) => {
+  try {
+    const pathId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.query.learner_id || req.query.id;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+
+    const plan = await AdaptiveLearningPlannerService.getActiveWeeklyPlan(pathId, learnerId, false);
+    return res.json({
+      success: true,
+      data: plan,
+    });
+  } catch (error) {
+    console.error('Error fetching current weekly plan:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to retrieve active weekly plan',
+    });
+  }
+});
+
+/**
+ * GET /api/learning-paths/:id/weekly-plan/history
+ * Retrieves all weekly plans (past and active) for this learning path.
+ */
+router.get('/learning-paths/:id/weekly-plan/history', async (req: Request, res: Response) => {
+  try {
+    const pathId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.query.learner_id || req.query.id;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+
+    const history = await AdaptiveLearningPlannerService.getPlanHistory(pathId, learnerId);
+    return res.json({
+      success: true,
+      count: history.length,
+      data: history,
+    });
+  } catch (error) {
+    console.error('Error fetching plan history:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to retrieve plan history',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/items/:itemId/complete or /toggle
+ * Marks or toggles completion of a weekly learning item.
+ */
+router.post(['/weekly-plans/:id/items/:itemId/complete', '/weekly-plans/:id/items/:itemId/toggle'], async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const itemId = parseInt(req.params.itemId, 10);
+    const rawLearnerId = req.body.learner_id || req.query.learner_id;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+
+    const updatedPlan = await AdaptiveLearningPlannerService.toggleItemCompletion(planId, itemId, learnerId);
+    return res.json({
+      success: true,
+      message: 'Weekly task status updated successfully.',
+      data: updatedPlan,
+    });
+  } catch (error) {
+    console.error('Error updating weekly task:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update weekly task',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/checkpoint/start
+ * Retrieves questions for taking the weekly checkpoint.
+ */
+router.post('/weekly-plans/:id/checkpoint/start', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.query.learner_id;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+
+    const checkpointData = await AdaptiveLearningPlannerService.getCheckpoint(planId, learnerId);
+    return res.json({
+      success: true,
+      data: checkpointData,
+    });
+  } catch (error) {
+    console.error('Error starting checkpoint:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to start weekly checkpoint',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/checkpoint/submit
+ * Submits answers for weekly checkpoint and triggers improvement analysis.
+ */
+router.post('/weekly-plans/:id/checkpoint/submit', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.body.learnerId;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+    const answers = req.body.answers || {};
+
+    const result = await AdaptiveLearningPlannerService.submitCheckpoint(planId, learnerId, answers);
+    return res.json({
+      success: true,
+      message: 'Weekly check evaluated successfully. Topic-level adaptation ready.',
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error submitting checkpoint:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to evaluate checkpoint',
+    });
+  }
+});
+
+/**
+ * GET /api/weekly-plans/:id/result
+ * Retrieves the latest result and improvement analysis for a weekly plan.
+ */
+router.get('/weekly-plans/:id/result', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.query.learner_id || req.query.id;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+
+    const data = await AdaptiveLearningPlannerService.getCheckpoint(planId, learnerId);
+    if (!data.result) {
+      return res.status(404).json({
+        success: false,
+        error: 'No checkpoint result found for this plan. Please complete the check first.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: data.result,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch result',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/generate-next-week
+ * Adapts and generates next week's plan based on current checkpoint and progress evidence.
+ */
+router.post('/weekly-plans/:id/generate-next-week', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.body.learnerId;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+
+    const currentPlan = await AdaptiveLearningPlannerService.assemblePlanDetails(planId);
+    const nextWeekPlan = await AdaptiveLearningPlannerService.generateWeeklyPlan(
+      currentPlan.learning_path_id,
+      learnerId,
+      currentPlan.week_number + 1
+    );
+
+    return res.json({
+      success: true,
+      message: `Week ${nextWeekPlan.week_number} plan generated with adaptive focus.`,
+      data: nextWeekPlan,
+    });
+  } catch (error) {
+    console.error('Error generating next week plan:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate next week plan',
+    });
+  }
+});
+
+/**
+ * POST /api/weekly-plans/:id/adjust
+ * Rapid user-controlled plan adjustment (less time, more time, need practice, already know).
+ */
+router.post('/weekly-plans/:id/adjust', async (req: Request, res: Response) => {
+  try {
+    const planId = parseInt(req.params.id, 10);
+    const rawLearnerId = req.body.learner_id || req.body.learnerId;
+    const learnerId = rawLearnerId ? parseInt(rawLearnerId as string, 10) : 1;
+    const { adjustment_type, reason } = req.body;
+
+    if (!['less_time', 'more_time', 'need_practice', 'already_know'].includes(adjustment_type)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid adjustment_type. Must be "less_time", "more_time", "need_practice", or "already_know".',
+      });
+    }
+
+    const adjustedPlan = await AdaptiveLearningPlannerService.adjustPlan(planId, learnerId, {
+      adjustment_type,
+      reason,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Weekly plan adjusted to your preferences.',
+      data: adjustedPlan,
+    });
+  } catch (error) {
+    console.error('Error adjusting plan:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to adjust weekly plan',
     });
   }
 });
