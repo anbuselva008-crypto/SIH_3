@@ -105,7 +105,7 @@ export class GroqProvider implements AIProvider {
 export class GeminiProvider implements AIProvider {
   public readonly name = 'Gemini';
   private aiClient: GoogleGenAI | null = null;
-  private readonly defaultModel = 'gemini-2.5-flash';
+  private readonly defaultModel = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 
   public isAvailable(): boolean {
     return Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);

@@ -308,6 +308,8 @@ export interface LearnerSchedulePreferences {
   updated_at?: string;
 }
 
+export type LearnerSchedulePreference = LearnerSchedulePreferences;
+
 export interface WeeklyLearningPlan {
   id: number;
   learner_id: number;
