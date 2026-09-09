@@ -33,7 +33,8 @@ import type {
   RecommendationItem,
   LearningResource,
   Quiz,
-  SupportedLanguage
+  SupportedLanguage,
+  DiscoveredResource
 } from './types/index.ts';
 
 export default function App() {
@@ -47,6 +48,7 @@ export default function App() {
   const [selectedCompetency, setSelectedCompetency] = useState<CompetencyItem | null>(null);
   const [selectedRecommendation, setSelectedRecommendation] = useState<RecommendationItem | null>(null);
   const [selectedResourceFallback, setSelectedResourceFallback] = useState<LearningResource | null>(null);
+  const [selectedDiscoveredResource, setSelectedDiscoveredResource] = useState<DiscoveredResource | null>(null);
   
   const [isAssessmentOpen, setIsAssessmentOpen] = useState<boolean>(false);
   const [assessmentFilter, setAssessmentFilter] = useState<string | null>(null);
@@ -458,7 +460,11 @@ export default function App() {
             if (matchedCatalogue) {
               setSelectedResourceFallback(matchedCatalogue);
               setSelectedRecommendation(null);
-              setIsDiscoveryOpen(false);
+              setSelectedDiscoveredResource(null);
+            } else {
+              setSelectedDiscoveredResource(resItem);
+              setSelectedResourceFallback(null);
+              setSelectedRecommendation(null);
             }
           }}
         />
@@ -473,14 +479,16 @@ export default function App() {
         onAssessmentCompleted={handleAssessmentCompleted}
       />
 
-      {/* Stage 3 & 4 Course Details & AI Quiz Modal */}
+      {/* Stage 3 & 4 Course Details & AI Quiz Modal + Stage 5A Discovered Resources */}
       <CourseDetailModal
         item={selectedRecommendation}
         resourceFallback={selectedResourceFallback}
+        discoveredResource={selectedDiscoveredResource}
         learnerId={learner.id}
         onClose={() => {
           setSelectedRecommendation(null);
           setSelectedResourceFallback(null);
+          setSelectedDiscoveredResource(null);
         }}
         onQuizCompleted={() => {
           setNotification('Grounded Practice Quiz attempt recorded. Baseline diagnostic scores remain protected.');

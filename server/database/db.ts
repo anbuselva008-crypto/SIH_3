@@ -197,6 +197,20 @@ export function initDatabase() {
       is_correct BOOLEAN NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS resource_verifications (
+      id SERIAL PRIMARY KEY,
+      resource_url TEXT NOT NULL UNIQUE,
+      verification_status VARCHAR(50) NOT NULL,
+      verification_reason TEXT NOT NULL,
+      quality_tier INTEGER DEFAULT 4,
+      resource_type VARCHAR(50) DEFAULT 'COURSE',
+      is_accessible BOOLEAN DEFAULT TRUE,
+      has_https BOOLEAN DEFAULT TRUE,
+      domain_consistent BOOLEAN DEFAULT TRUE,
+      verified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      expires_at TIMESTAMP
+    );
   `);
 
   // Check if data already exists

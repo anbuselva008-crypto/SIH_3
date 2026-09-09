@@ -16,9 +16,13 @@ import {
   ChevronUp,
   Award,
   Layers,
-  Check
+  Check,
+  TrendingUp,
+  SlidersHorizontal,
+  TableProperties,
+  AlertTriangle
 } from 'lucide-react';
-import type { DiscoveredResource, DiscoveryResponse, SupportedLanguage } from '../types/index.ts';
+import type { DiscoveredResource, DiscoveryResponse, SupportedLanguage, VerificationStatus } from '../types/index.ts';
 import { fetchLearningDiscovery } from '../services/api.ts';
 import { getDiscoveryT } from '../i18n/discoveryTranslations.ts';
 
@@ -28,6 +32,7 @@ interface LearningDiscoveryModalProps {
   language?: SupportedLanguage;
   onClose: () => void;
   onViewResourceDetails?: (resource: DiscoveredResource) => void;
+  onSelectSkillGap?: (newSkill: string) => void;
 }
 
 export default function LearningDiscoveryModal({
@@ -36,12 +41,14 @@ export default function LearningDiscoveryModal({
   language = 'en',
   onClose,
   onViewResourceDetails,
+  onSelectSkillGap,
 }: LearningDiscoveryModalProps) {
   const t = getDiscoveryT(language);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DiscoveryResponse | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [showComparison, setShowComparison] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadDiscovery = async (forceRefresh: boolean = false) => {
@@ -66,30 +73,59 @@ export default function LearningDiscoveryModal({
   }, [skillGap, learnerId]);
 
   const bestMatch = data?.best_match;
+  const strongAlternatives = data?.strong_alternatives || [];
   const otherOptions = data?.other_options || [];
   const remainingResources = (data?.all_resources || []).slice(5);
+  const comparisonTable = data?.comparison_table || [];
+  const futureSkills = data?.future_skills_context || [];
 
-  const renderVerificationBadge = (status: string) => {
-    if (status === 'Verified') {
+  const renderVerificationBadge = (status?: string | VerificationStatus) => {
+    const s = String(status || '').toUpperCase();
+    if (s === 'VERIFIED') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300">
           <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-          {t.verified}
+          VERIFIED SOURCE
         </span>
       );
     }
-    if (status === 'Institutional') {
+    if (s === 'PARTIALLY_VERIFIED' || s === 'INSTITUTIONAL') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-          <Building2 className="w-3 h-3 text-indigo-600" />
-          {t.institutional}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+          <Building2 className="w-3 h-3 text-blue-600" />
+          ACCREDITED ACADEMIC
+        </span>
+      );
+    }
+    if (s === 'BROKEN') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-300">
+          <AlertCircle className="w-3 h-3 text-rose-600" />
+          LINK INACCESSIBLE
+        </span>
+      );
+    }
+    if (s === 'REJECTED') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-300 line-through">
+          DISQUALIFIED
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
         <AlertCircle className="w-3 h-3 text-slate-400" />
-        {t.not_verified}
+        UNVERIFIED
+      </span>
+    );
+  };
+
+  const renderResourceTypeBadge = (type?: string) => {
+    if (!type) return null;
+    const tClean = type.toUpperCase().replace('_', ' ');
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 uppercase tracking-wide">
+        {tClean}
       </span>
     );
   };
@@ -118,15 +154,15 @@ export default function LearningDiscoveryModal({
       role="dialog"
       aria-modal="true"
     >
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header */}
-        <div className="px-6 py-5 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white flex items-start justify-between gap-4 shrink-0">
+        <div className="px-6 py-5 bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 text-white flex items-start justify-between gap-4 shrink-0">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-400 text-slate-950 uppercase tracking-wider">
                 <Compass className="w-3.5 h-3.5" />
-                Stage 5A Discovery
+                Stage 5B Verified Selection
               </span>
               {data && (
                 <span className="text-xs text-blue-200">
@@ -139,11 +175,12 @@ export default function LearningDiscoveryModal({
               🎯 {t.learn_gap_prefix} {skillGap}
             </h2>
 
-            <p className="text-xs text-blue-100 mt-1 max-w-xl leading-relaxed">
+            <p className="text-xs text-blue-100 mt-1 max-w-2xl leading-relaxed">
               {data ? (
                 <>
-                  {t.matching_role_assignment}{' '}
-                  <span className="text-amber-300 font-medium">({data.learner_context.assignment})</span>
+                  Quality-evaluated and verified for your assignment{' '}
+                  <span className="text-amber-300 font-semibold">({data.learner_context.assignment})</span>
+                  {' '}and cadre requirements.
                 </>
               ) : (
                 t.discovery_subtitle
@@ -192,9 +229,9 @@ export default function LearningDiscoveryModal({
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-700">
                 <Compass className="w-6 h-6 animate-spin" />
               </div>
-              <p className="text-sm font-semibold text-slate-700">{t.searching_resources}</p>
-              <div className="h-40 bg-white border border-slate-200 rounded-xl max-w-xl mx-auto"></div>
-              <div className="h-24 bg-white border border-slate-200 rounded-xl max-w-xl mx-auto"></div>
+              <p className="text-sm font-semibold text-slate-700">Verifying sources and selecting best match...</p>
+              <div className="h-44 bg-white border border-slate-200 rounded-xl max-w-xl mx-auto"></div>
+              <div className="h-28 bg-white border border-slate-200 rounded-xl max-w-xl mx-auto"></div>
             </div>
           )}
 
@@ -213,49 +250,111 @@ export default function LearningDiscoveryModal({
               {bestMatch ? (
                 <div 
                   id="discovery-best-match-card"
-                  className="bg-white rounded-xl border-2 border-amber-400/80 shadow-md p-5 relative overflow-hidden"
+                  className="bg-white rounded-xl border-2 border-amber-400 shadow-md p-5 relative overflow-hidden space-y-4"
                 >
-                  <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 uppercase tracking-wider shadow-2xs">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 uppercase tracking-wider shadow-2xs">
                         <Sparkles className="w-3.5 h-3.5" />
-                        ⭐ {t.best_match}
+                        ⭐ BEST MATCH ({bestMatch.ranking_score}/100)
                       </span>
                       {renderSourceTypeBadge(bestMatch.source_type)}
                       {renderVerificationBadge(bestMatch.verification_status)}
+                      {renderResourceTypeBadge(bestMatch.resource_type)}
                     </div>
 
-                    <span className="text-[11px] font-semibold text-slate-500">
-                      Tier {bestMatch.source_tier}: {bestMatch.provider_type}
+                    <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+                      Tier {bestMatch.quality_tier || bestMatch.source_tier}: {bestMatch.provider_name}
                     </span>
                   </div>
 
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">
-                    {bestMatch.title}
-                  </h3>
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-950 leading-snug">
+                      {bestMatch.title}
+                    </h3>
 
-                  <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                    {bestMatch.description}
-                  </p>
-
-                  {/* Why this is useful explanation */}
-                  <div className="mt-3.5 p-3 rounded-lg bg-blue-50/70 border border-blue-100 text-xs">
-                    <p className="font-bold text-blue-900 flex items-center gap-1.5 mb-1">
-                      <ShieldCheck className="w-4 h-4 text-blue-700" />
-                      {t.why_useful}:
-                    </p>
-                    <p className="text-blue-800 leading-relaxed font-medium">
-                      {bestMatch.match_reason}
+                    <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                      {bestMatch.description}
                     </p>
                   </div>
 
+                  {/* Why this was selected as Best Match */}
+                  <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50/70 border border-blue-200/80 space-y-2 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-bold text-blue-950 flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-blue-700" />
+                        Why This Is Selected as Your Best Match:
+                      </p>
+                      {bestMatch.stage5b_breakdown && (
+                        <span className="text-[11px] font-mono text-blue-900 font-bold">
+                          Fit Score: {bestMatch.stage5b_breakdown.totalScore}/100
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-blue-900 leading-relaxed font-medium">
+                      {bestMatch.selection_reason || bestMatch.match_reason}
+                    </p>
+
+                    {/* Structured Reason Bullets */}
+                    {bestMatch.structured_reasons && bestMatch.structured_reasons.length > 0 && (
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                        {bestMatch.structured_reasons.map((r, i) => (
+                          <li key={i} className="flex items-center gap-1.5 text-[11px] text-blue-900 font-medium">
+                            <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>{r}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {/* Prerequisite or duplicate notice */}
+                    {bestMatch.prerequisite_warning && (
+                      <div className="mt-2 p-2 rounded bg-amber-100/80 border border-amber-300 text-amber-900 text-[11px] flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                        <span>{bestMatch.prerequisite_warning}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Stage 5B Score Dimension Breakdown Chips */}
+                  {bestMatch.stage5b_breakdown && (
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 text-center">
+                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">Competency</p>
+                        <p className="text-xs font-black text-slate-800">{bestMatch.stage5b_breakdown.competencyMatch}/25</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">Assignment</p>
+                        <p className="text-xs font-black text-slate-800">{bestMatch.stage5b_breakdown.assignmentMatch}/20</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">Cadre Role</p>
+                        <p className="text-xs font-black text-slate-800">{bestMatch.stage5b_breakdown.roleMatch}/15</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">Source Trust</p>
+                        <p className="text-xs font-black text-slate-800">{bestMatch.stage5b_breakdown.sourceAuthority}/15</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">Level / Lang</p>
+                        <p className="text-xs font-black text-slate-800">
+                          {bestMatch.stage5b_breakdown.levelFit + bestMatch.stage5b_breakdown.languageFit}/10
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Provider & Action Strip */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="text-xs text-slate-600 flex items-center gap-2">
+                  <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="text-xs text-slate-600 flex items-center gap-2 flex-wrap">
                       <Building2 className="w-4 h-4 text-slate-400" />
                       <span>{t.source}: <strong className="text-slate-800">{bestMatch.provider_name}</strong></span>
                       {bestMatch.estimated_duration && (
                         <span className="text-slate-400">· {bestMatch.estimated_duration}</span>
+                      )}
+                      {bestMatch.language && (
+                        <span className="text-slate-500 font-medium">· {bestMatch.language}</span>
                       )}
                     </div>
 
@@ -287,35 +386,37 @@ export default function LearningDiscoveryModal({
                 </div>
               )}
 
-              {/* 2. Other Useful Options */}
-              {otherOptions.length > 0 && (
+              {/* 2. Strong Alternatives */}
+              {strongAlternatives.length > 0 && (
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-blue-700" />
-                      {t.other_useful_options} ({otherOptions.length})
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-indigo-700" />
+                      Strong Alternatives ({strongAlternatives.length})
                     </h4>
                     <span className="text-[11px] text-slate-500">
-                      Ranked by operational fit &amp; source authority
+                      High-authority verified options
                     </span>
                   </div>
 
-                  <div className="space-y-2.5">
-                    {otherOptions.map((item) => (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {strongAlternatives.map((item) => (
                       <div
                         key={item.id}
-                        className="bg-white rounded-xl border border-slate-200 p-4 hover:border-slate-300 hover:shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                        className="bg-white rounded-xl border border-slate-200 p-4 hover:border-slate-300 hover:shadow-xs transition-all flex flex-col justify-between space-y-3"
                       >
-                        <div className="space-y-1.5 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {renderSourceTypeBadge(item.source_type)}
-                            {renderVerificationBadge(item.verification_status)}
-                            <span className="text-[11px] text-slate-500 font-medium">
-                              {item.provider_name}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-1 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                              {renderVerificationBadge(item.verification_status)}
+                              {renderResourceTypeBadge(item.resource_type)}
+                            </div>
+                            <span className="text-xs font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                              {item.ranking_score}/100
                             </span>
                           </div>
 
-                          <h5 className="font-bold text-sm text-slate-900">
+                          <h5 className="font-bold text-sm text-slate-900 leading-snug">
                             {item.title}
                           </h5>
 
@@ -324,29 +425,33 @@ export default function LearningDiscoveryModal({
                           </p>
 
                           <p className="text-[11px] text-blue-800 font-medium">
-                            {item.match_reason}
+                            {item.selection_reason || item.match_reason}
                           </p>
                         </div>
 
-                        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-colors cursor-pointer"
-                          >
-                            <span>{t.open_resource}</span>
-                            <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-                          </a>
-
-                          {onViewResourceDetails && (
-                            <button
-                              onClick={() => onViewResourceDetails(item)}
-                              className="text-[11px] text-blue-700 hover:text-blue-900 font-semibold cursor-pointer hover:underline"
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-slate-500 truncate max-w-[150px]">
+                            {item.provider_name}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {onViewResourceDetails && (
+                              <button
+                                onClick={() => onViewResourceDetails(item)}
+                                className="text-[11px] text-blue-700 hover:text-blue-900 font-semibold cursor-pointer hover:underline"
+                              >
+                                {t.view_details}
+                              </button>
+                            )}
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold"
                             >
-                              {t.view_details}
-                            </button>
-                          )}
+                              <span>Open</span>
+                              <ExternalLink className="w-3 h-3 text-slate-500" />
+                            </a>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -354,7 +459,144 @@ export default function LearningDiscoveryModal({
                 </div>
               )}
 
-              {/* 3. See All Relevant Resources Expander */}
+              {/* 3. Decision Matrix / Comparison Table */}
+              {comparisonTable.length > 1 && (
+                <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                      <TableProperties className="w-4 h-4 text-blue-700" />
+                      Comparative Selection Matrix
+                    </h4>
+                    <button
+                      onClick={() => setShowComparison(!showComparison)}
+                      className="text-xs text-blue-700 hover:text-blue-900 font-semibold cursor-pointer"
+                    >
+                      {showComparison ? 'Hide Table' : 'Show Table'}
+                    </button>
+                  </div>
+
+                  {showComparison && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px]">
+                            <th className="py-2.5 px-3">Resource / Provider</th>
+                            <th className="py-2.5 px-2 text-center">Fit Score</th>
+                            <th className="py-2.5 px-2">Type</th>
+                            <th className="py-2.5 px-2">Verification</th>
+                            <th className="py-2.5 px-2">Level</th>
+                            <th className="py-2.5 px-2">Language</th>
+                            <th className="py-2.5 px-2 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {comparisonTable.map((row, idx) => (
+                            <tr key={row.id} className={idx === 0 ? 'bg-amber-50/50 font-medium' : ''}>
+                              <td className="py-2.5 px-3">
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-1.5">
+                                    {idx === 0 && (
+                                      <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                                        BEST
+                                      </span>
+                                    )}
+                                    <span className="font-bold text-slate-900 truncate max-w-[220px]">
+                                      {row.title}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-slate-500">{row.provider_name}</p>
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-2 text-center font-bold text-slate-900">
+                                <span className={`px-2 py-0.5 rounded font-mono ${idx === 0 ? 'bg-amber-200 text-amber-950' : 'bg-slate-100 text-slate-700'}`}>
+                                  {row.fit_score}/100
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-2">
+                                <span className="text-[11px] font-medium text-slate-600 uppercase">
+                                  {row.resource_type.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-2">
+                                {renderVerificationBadge(row.verification_status)}
+                              </td>
+                              <td className="py-2.5 px-2 text-slate-600">
+                                {row.level}
+                              </td>
+                              <td className="py-2.5 px-2 text-slate-600">
+                                {row.language}
+                              </td>
+                              <td className="py-2.5 px-2 text-right">
+                                <a
+                                  href={row.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-blue-700 hover:text-blue-900 font-bold hover:underline"
+                                >
+                                  <span>Open</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 4. Strategic Future Skills Section */}
+              {futureSkills.length > 0 && (
+                <div className="p-4 rounded-xl bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1 rounded-md bg-purple-600 text-white">
+                        <TrendingUp className="w-4 h-4" />
+                      </span>
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-purple-950">
+                          Strategic Future Skills Framework
+                        </h4>
+                        <p className="text-[11px] text-purple-800">
+                          Forward-looking capabilities earmarked for future career milestones (distinct from current gaps).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    {futureSkills.map((fs) => (
+                      <div 
+                        key={fs.id} 
+                        className="bg-white/80 backdrop-blur-xs p-3 rounded-lg border border-purple-200 flex items-start justify-between gap-2"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs text-purple-950">{fs.name}</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 font-bold">
+                              Future Skill
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 leading-snug">
+                            {fs.explanation}
+                          </p>
+                        </div>
+                        {onSelectSkillGap && (
+                          <button
+                            onClick={() => onSelectSkillGap(fs.name)}
+                            className="px-2.5 py-1 text-[10px] font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 rounded shrink-0 cursor-pointer"
+                          >
+                            Explore
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 5. See All Relevant Resources Expander */}
               {remainingResources.length > 0 && (
                 <div className="pt-2">
                   <button
@@ -386,6 +628,7 @@ export default function LearningDiscoveryModal({
                               {renderSourceTypeBadge(item.source_type)}
                               {renderVerificationBadge(item.verification_status)}
                               <span className="text-[11px] text-slate-500">{item.provider_name}</span>
+                              <span className="text-xs font-mono font-bold text-slate-700">({item.ranking_score}/100)</span>
                             </div>
                             <h6 className="text-xs font-bold text-slate-900">{item.title}</h6>
                             <p className="text-[11px] text-slate-500 line-clamp-1">{item.description}</p>
@@ -410,10 +653,10 @@ export default function LearningDiscoveryModal({
               {/* Safe Link Transparency Notice */}
               <div className="p-3 rounded-lg bg-slate-100 border border-slate-200 text-[11px] text-slate-500 flex items-center justify-between gap-2">
                 <span>
-                  External learning links open in a new tab. All links pass protocol safety screening.
+                  All learning links pass strict SSRF screening and domain verification.
                 </span>
                 <span className="font-semibold text-slate-700 shrink-0">
-                  {data.source_breakdown.web_discovered} Web · {data.source_breakdown.demo_catalogue} Prototype
+                  {data.source_breakdown.web_discovered} Live Web · {data.source_breakdown.demo_catalogue} Prototype Catalogue
                 </span>
               </div>
             </>
@@ -426,7 +669,7 @@ export default function LearningDiscoveryModal({
             onClick={onClose}
             className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer transition-colors"
           >
-            {t.show_fewer === 'Close' ? 'Close' : 'Close'}
+            Close
           </button>
         </div>
 

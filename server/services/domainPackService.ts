@@ -174,10 +174,14 @@ export class DomainPackService {
   /**
    * Get Future Skills relevant to a specific role
    */
-  static getFutureSkillsForRole(roleId: string): FutureSkillItem[] {
-    const cleanId = roleId.toLowerCase();
+  static getFutureSkillsForRole(roleIdOrName: string): FutureSkillItem[] {
+    const role = this.resolveRole(roleIdOrName);
+    const targetId = role ? role.id.toLowerCase() : roleIdOrName.toLowerCase().replace(/_/g, '-');
     return FUTURE_SKILLS.filter(
-      (fs) => fs.relevant_roles.some((r) => r.toLowerCase() === cleanId) || fs.relevant_roles.includes('all')
+      (fs) => fs.relevant_roles.some((r) => {
+        const cleanR = r.toLowerCase().replace(/_/g, '-');
+        return cleanR === targetId || cleanR === roleIdOrName.toLowerCase() || r === 'all';
+      }) || fs.relevant_roles.includes('all')
     );
   }
 

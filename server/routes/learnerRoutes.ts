@@ -6,6 +6,7 @@ import { DocumentService } from '../services/documentService.ts';
 import { QuizService } from '../services/quizService.ts';
 import { DomainPackService } from '../services/domainPackService.ts';
 import { LearningDiscoveryService } from '../services/learningDiscovery/discoveryService.ts';
+import { VerificationService } from '../services/learningDiscovery/verificationService.ts';
 import { getActiveAIProvider } from '../services/aiProvider.ts';
 import { getDbStatus } from '../database/db.ts';
 
@@ -440,11 +441,11 @@ router.get('/recommendations/:id', async (req: Request, res: Response) => {
 // =========================================================================
 
 /**
- * GET /api/learning-discovery
+ * GET /api/learning-discovery & GET /api/learners/me/learning-discovery
  * Discovers and ranks relevant learning resources (hybrid: live web + demo catalogue)
  * for a specific officer's skill gap, role, and operational assignment.
  */
-router.get('/learning-discovery', async (req: Request, res: Response) => {
+router.get(['/learning-discovery', '/learners/me/learning-discovery'], async (req: Request, res: Response) => {
   try {
     const rawId = req.query.learner_id || req.query.id;
     const learnerId = rawId ? parseInt(rawId as string, 10) : 1;
@@ -511,6 +512,68 @@ router.post('/learning-discovery/search', async (req: Request, res: Response) =>
       success: false,
       error: error instanceof Error ? error.message : 'Internal server error during search',
     });
+  }
+});
+
+/**
+ * GET /api/learners/me/best-learning-options
+ * Stage 5B endpoint: returns the curated Best Match, Strong Alternatives, Comparison Table, and Future Skills.
+ */
+router.get('/learners/me/best-learning-options', async (req: Request, res: Response) => {
+  try {
+    const rawId = req.query.learner_id || req.query.id;
+    const learnerId = rawId ? parseInt(rawId as string, 10) : 1;
+    const skill = (req.query.skill as string) || '';
+    const forceRefresh = req.query.force_refresh === 'true' || req.query.refresh === 'true';
+
+    const discovery = await LearningDiscoveryService.discoverForLearner(learnerId, skill, forceRefresh);
+
+    return res.json({
+      success: true,
+      data: {
+        best_match: discovery.best_match,
+        strong_alternatives: discovery.strong_alternatives || [],
+        comparison_table: discovery.comparison_table || [],
+        future_skills_context: discovery.future_skills_context || [],
+        learner_context: discovery.learner_context,
+        total_evaluated: discovery.total_found,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching best learning options:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to retrieve best learning options',
+    });
+  }
+});
+
+/**
+ * GET /api/learning-resources/verify
+ * Audits and returns real-time verification details for any URL.
+ */
+router.get('/learning-resources/verify', async (req: Request, res: Response) => {
+  try {
+    const url = req.query.url as string;
+    if (!url) {
+      return res.status(400).json({ success: false, error: 'url query parameter is required' });
+    }
+
+    const dummyResource: any = {
+      title: (req.query.title as string) || '',
+      url,
+      provider_name: (req.query.provider as string) || '',
+      source_type: 'web_discovered',
+      description: '',
+    };
+
+    const audit = VerificationService.verifyResource(dummyResource);
+    return res.json({
+      success: true,
+      data: audit,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Verification check failed' });
   }
 });
 

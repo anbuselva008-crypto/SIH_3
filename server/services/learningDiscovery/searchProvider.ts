@@ -28,10 +28,40 @@ export const INSTITUTIONAL_WEB_COURSES: SearchCandidate[] = [
     sourceDomain: 'nptel.ac.in',
   },
   {
+    title: 'CPWD Works Manual & Public Works Contract Arbitration Guidelines',
+    url: 'https://cpwd.gov.in/manual/works-manual-contract-management.pdf',
+    snippet: 'Official Ministry of Housing and Urban Affairs standard operating procedure and handbook on government works execution, tender documentation, contract dispute settlement, and engineer supervision.',
+    sourceDomain: 'cpwd.gov.in',
+  },
+  {
+    title: 'Software Vendor Contract & Cloud Licensing Management',
+    url: 'https://it-academy.org/courses/software-licensing-contracts',
+    snippet: 'Legal and technical management of SaaS enterprise agreements, open source intellectual property licenses, SLA uptime penalties, and software vendor negotiation for IT departments.',
+    sourceDomain: 'it-academy.org',
+  },
+  {
     title: 'Quality Control and Concrete Technology - NPTEL / IIT Roorkee',
     url: 'https://nptel.ac.in/courses/105107122',
     snippet: 'Rigorous engineering quality assurance, non-destructive testing, mix design compliance, and site inspection protocols for public highway and building construction.',
     sourceDomain: 'nptel.ac.in',
+  },
+  {
+    title: 'Foundations of Structural Analysis & Mechanics of Materials - SWAYAM',
+    url: 'https://swayam.gov.in/courses/structural-analysis-foundation',
+    snippet: 'Fundamental beginner to intermediate engineering principles of stress-strain relationships, beam deflection, truss analysis, and shear force diagrams for infrastructure engineers.',
+    sourceDomain: 'swayam.gov.in',
+  },
+  {
+    title: 'Advanced Multivariable Structural Dynamics & Finite Element Analysis - IIT Bombay',
+    url: 'https://civil.iitb.ac.in/courses/advanced-structural-dynamics-fea',
+    snippet: 'Post-graduate level advanced continuum mechanics, non-linear seismic eigenvalue solvers, and finite element discretization requiring prior completion of matrix structural analysis.',
+    sourceDomain: 'civil.iitb.ac.in',
+  },
+  {
+    title: 'Introduction to Python Programming - Open MOOC',
+    url: 'https://openlearning.ac.in/courses/intro-python-basics',
+    snippet: 'Introductory level basic syntax, variables, loops, and conditional statements for first-time learners with no programming experience.',
+    sourceDomain: 'openlearning.ac.in',
   },
   {
     title: 'Smart Cities & Urban Infrastructure Planning - SWAYAM',
@@ -122,6 +152,20 @@ export const INSTITUTIONAL_WEB_COURSES: SearchCandidate[] = [
     url: 'https://gem.gov.in/training',
     snippet: 'Direct purchase, L1 price comparison, reverse auction bidding, contract creation, and consignee receipt certificate (CRAC) procedures on GeM portal.',
     sourceDomain: 'gem.gov.in',
+  },
+
+  // Multilingual & Regional Language Courses (Tamil, Hindi)
+  {
+    title: 'Public Administration & Office Governance in Tamil (தமிழ்) - Tamil Virtual Academy',
+    url: 'https://www.tamilvu.org/courses/governance-admin-tamil',
+    snippet: 'Official Tamil language administrative module covering statutory procedures, government record management, and public service delivery protocols in Tamil for state civil servants.',
+    sourceDomain: 'tamilvu.org',
+  },
+  {
+    title: 'Computer Applications & Statistical Concepts in Tamil (தமிழ்) - NPTEL / IIT Madras',
+    url: 'https://nptel.ac.in/courses/tamil/106106182',
+    snippet: 'Comprehensive Tamil translated course for public officials on computational data analysis, statistical indices, and survey data management in Tamil.',
+    sourceDomain: 'nptel.ac.in',
   },
 ];
 
@@ -295,26 +339,139 @@ export class DuckDuckGoSearchProvider implements ISearchProvider {
 }
 
 /**
- * Composite search provider: tries live DDG, falls back to institutional open directory
+ * Tavily AI Web Search Provider
+ * Secure, server-side only integration for live learning resource discovery.
+ * Uses TAVILY_API_KEY environment variable. Never exposes or logs the key.
+ */
+export class TavilySearchProvider implements ISearchProvider {
+  public readonly name = 'Tavily Search API';
+  private static cache: Map<string, CacheEntry> = new Map();
+  private static CACHE_TTL_MS = 15 * 60 * 1000;
+
+  public async search(query: string, limit: number = 8): Promise<SearchCandidate[]> {
+    const apiKey = process.env.TAVILY_API_KEY?.trim();
+    if (!apiKey) {
+      return [];
+    }
+
+    const cacheKey = query.trim().toLowerCase();
+    const cached = TavilySearchProvider.cache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < TavilySearchProvider.CACHE_TTL_MS)) {
+      return cached.results.slice(0, limit);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    try {
+      const response = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          api_key: apiKey,
+          query,
+          search_depth: 'basic',
+          include_answer: false,
+          max_results: limit,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn(`[TavilySearchProvider] Tavily search returned HTTP ${response.status}`);
+        return [];
+      }
+
+      const json: any = await response.json();
+      if (!json || !Array.isArray(json.results)) {
+        return [];
+      }
+
+      const candidates: SearchCandidate[] = [];
+      for (const item of json.results) {
+        if (!item.url || !item.title) continue;
+
+        let domain = '';
+        try {
+          const parsed = new URL(item.url);
+          domain = parsed.hostname.replace(/^www\./, '').toLowerCase();
+        } catch {
+          continue;
+        }
+
+        // Filter out social media / non-learning domains
+        const blockedDomains = [
+          'facebook.com', 'twitter.com', 'x.com', 'instagram.com',
+          'pinterest.com', 'tiktok.com', 'reddit.com', 'quora.com'
+        ];
+        if (blockedDomains.some(b => domain.includes(b))) {
+          continue;
+        }
+
+        candidates.push({
+          title: item.title,
+          url: item.url,
+          snippet: item.content || '',
+          sourceDomain: domain,
+        });
+      }
+
+      TavilySearchProvider.cache.set(cacheKey, {
+        timestamp: Date.now(),
+        results: candidates,
+      });
+
+      return candidates.slice(0, limit);
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      console.warn('[TavilySearchProvider] Tavily request failed or timed out:', err.name || err.message);
+      return [];
+    }
+  }
+}
+
+/**
+ * Composite search provider:
+ * 1. Tries Tavily AI web search if TAVILY_API_KEY is configured
+ * 2. Falls back to DuckDuckGo lite search
+ * 3. Falls back to curated National Institutional Open Course Directory
  */
 export class CompositeSearchProvider implements ISearchProvider {
   public readonly name = 'Composite Web & Institutional Discovery';
+  private tavily = new TavilySearchProvider();
   private ddg = new DuckDuckGoSearchProvider();
   private inst = new InstitutionalDirectorySearchProvider();
 
   public async search(query: string, limit: number = 8): Promise<SearchCandidate[]> {
-    // 1. Try DuckDuckGo
+    // 1. Try Tavily first if API key is present
+    if (process.env.TAVILY_API_KEY?.trim()) {
+      try {
+        const tavilyResults = await this.tavily.search(query, limit);
+        if (tavilyResults.length > 0) {
+          return tavilyResults;
+        }
+      } catch {
+        // Fall through safely to backup providers
+      }
+    }
+
+    // 2. Try DuckDuckGo
     try {
       const ddgResults = await this.ddg.search(query, limit);
       if (ddgResults.length > 0) {
         return ddgResults;
       }
     } catch {
-      // Ignore
+      // Fall through safely to backup provider
     }
 
-    // 2. Query verified institutional open course directory
-    const instResults = await this.inst.search(query, limit);
-    return instResults;
+    // 3. Fallback to curated Institutional Open Course Directory
+    return this.inst.search(query, limit);
   }
 }
+

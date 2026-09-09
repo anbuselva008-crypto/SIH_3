@@ -66,9 +66,9 @@ export class QueryBuilder {
     }
 
     // Build focused query components:
-    // Format: "[Skill Gap]" [domain/role] [assignment] government course training
+    // Format: [Skill Gap] [domain/role] [assignment] government course training
     const queryParts: string[] = [];
-    queryParts.push(`"${cleanSkill}"`);
+    queryParts.push(cleanSkill);
 
     if (domainKeywords.length > 0) {
       queryParts.push(domainKeywords[0]);

@@ -4,7 +4,9 @@ import { DomainPackService } from '../domainPackService.ts';
 import type { 
   DiscoveryQuery, 
   DiscoveryResponse, 
-  DiscoveredResource 
+  DiscoveredResource,
+  ComparisonTableRow,
+  SourceTier
 } from './types.ts';
 import { QueryBuilder } from './queryBuilder.ts';
 import { CompositeSearchProvider, type ISearchProvider } from './searchProvider.ts';
@@ -45,16 +47,42 @@ export class LearningDiscoveryService {
 
     // If no specific skill gap provided, pick the learner's #1 critical gap
     let targetSkill = (skillGapName || '').trim();
+    let currentScore = 45;
+    const gapReport = await LearnerService.getSkillGapAnalysis(learnerId);
+
     if (!targetSkill) {
-      const gapReport = await LearnerService.getSkillGapAnalysis(learnerId);
       if (gapReport.priority_areas && gapReport.priority_areas.length > 0) {
         targetSkill = gapReport.priority_areas[0].name;
+        currentScore = gapReport.priority_areas[0].score;
       } else if (gapReport.all_competencies && gapReport.all_competencies.length > 0) {
         targetSkill = gapReport.all_competencies[0].name;
+        currentScore = gapReport.all_competencies[0].score;
       } else {
         targetSkill = 'Survey Methodology';
       }
+    } else {
+      const match = (gapReport.all_competencies || []).find(c => c.name.toLowerCase() === targetSkill.toLowerCase());
+      if (match) {
+        currentScore = match.score;
+      }
     }
+
+    // Parse previous training if stored
+    let previousTraining: string[] = [];
+    if (learner.previous_training) {
+      if (Array.isArray(learner.previous_training)) {
+        previousTraining = learner.previous_training;
+      } else if (typeof learner.previous_training === 'string') {
+        try {
+          previousTraining = JSON.parse(learner.previous_training);
+        } catch {
+          previousTraining = [learner.previous_training];
+        }
+      }
+    }
+
+    // Fetch future skills context for this cadre role
+    const futureSkills = DomainPackService.getFutureSkillsForRole(resolvedRole.id);
 
     const query: DiscoveryQuery = {
       skillGap: targetSkill,
@@ -66,10 +94,25 @@ export class LearningDiscoveryService {
       department: learner.department || 'General Administration',
       assignment: learner.current_assignment || resolvedRole.typical_assignments[0] || '',
       preferredLanguage: learner.language_preference || 'en',
+      desiredLevel: currentScore < 40 ? 'Beginner' : currentScore < 70 ? 'Intermediate' : 'Advanced',
+      previousTraining,
+      currentCompetencyScore: currentScore,
       forceRefresh,
     };
 
-    return this.discoverResources(query);
+    const response = await this.discoverResources(query);
+
+    // Attach future skills context
+    if (futureSkills && futureSkills.length > 0) {
+      response.future_skills_context = futureSkills.map(fs => ({
+        id: fs.id,
+        name: fs.name,
+        recommended_proficiency: fs.recommended_proficiency || 'Intermediate',
+        explanation: fs.explanation || `Strategic capability earmarked for future career milestones in ${resolvedRole.name}.`,
+      }));
+    }
+
+    return response;
   }
 
   /**
@@ -93,13 +136,21 @@ export class LearningDiscoveryService {
 
     // 3. Attempt Web Search via SearchProvider
     try {
-      const rawSearch = await this.searchProvider.search(primaryQuery, 8);
+      const rawSearch = await this.searchProvider.search(primaryQuery, 10);
       if (rawSearch && rawSearch.length > 0) {
         webSearchSuccess = true;
         webCandidates = rawSearch.map((candidate, idx) => {
           const normalized = ResourceNormalizer.normalizeWebCandidate(candidate, idx, query);
-          const verification = VerificationService.verifyResource(normalized);
-          normalized.verification_status = verification.status;
+          const audit = VerificationService.verifyResource(normalized);
+          normalized.verification_status = audit.status;
+          normalized.verification_reason = audit.verification_reason;
+          normalized.quality_tier = audit.quality_tier;
+          normalized.resource_type = audit.resource_type;
+          normalized.is_accessible = audit.is_accessible;
+          normalized.has_https = audit.has_https;
+          normalized.domain_consistent = audit.domain_consistent;
+          normalized.verified_at = audit.verified_at;
+          normalized.verification_expires_at = audit.verification_expires_at;
           return normalized;
         });
       }
@@ -112,7 +163,20 @@ export class LearningDiscoveryService {
     let catalogueResources: DiscoveredResource[] = [];
     try {
       const allDbResources = await RecommendationService.getAllLearningResources();
-      catalogueResources = allDbResources.map(r => ResourceNormalizer.normalizeCatalogueResource(r, query));
+      catalogueResources = allDbResources.map(r => {
+        const normalized = ResourceNormalizer.normalizeCatalogueResource(r, query);
+        const audit = VerificationService.verifyResource(normalized);
+        normalized.verification_status = audit.status;
+        normalized.verification_reason = audit.verification_reason;
+        normalized.quality_tier = audit.quality_tier;
+        normalized.resource_type = audit.resource_type;
+        normalized.is_accessible = audit.is_accessible;
+        normalized.has_https = audit.has_https;
+        normalized.domain_consistent = audit.domain_consistent;
+        normalized.verified_at = audit.verified_at;
+        normalized.verification_expires_at = audit.verification_expires_at;
+        return normalized;
+      });
     } catch (dbError) {
       console.warn('[LearningDiscoveryService] Error loading demo catalogue:', dbError);
     }
@@ -120,7 +184,7 @@ export class LearningDiscoveryService {
     // 5. Combine into unified pool and deduplicate
     const unifiedPool = ResourceNormalizer.deduplicateResources([...webCandidates, ...catalogueResources]);
 
-    // 6. Execute deterministic ranking
+    // 6. Execute deterministic ranking & Stage 5B quality evaluation
     const rankedResources = this.rankingService.rankResources(unifiedPool, query);
 
     // 7. Calculate source breakdown
@@ -146,15 +210,35 @@ export class LearningDiscoveryService {
     }
 
     const bestMatch = rankedResources.length > 0 ? rankedResources[0] : null;
-    const otherOptions = rankedResources.slice(1, 5); // Up to 4 other options (top 3–5 total)
+    const strongAlternatives = rankedResources.filter((r, idx) => idx > 0 && r.selection_status === 'STRONG_ALTERNATIVE').slice(0, 2);
+    const otherOptions = rankedResources.slice(1, 6);
+
+    // 9. Build structured comparison table for top options
+    const topForComparison = rankedResources.slice(0, 4);
+    const comparisonTable: ComparisonTableRow[] = topForComparison.map(r => ({
+      id: r.id,
+      title: r.title,
+      provider_name: r.provider_name,
+      selection_status: r.selection_status || 'ALTERNATIVE',
+      fit_score: r.ranking_score,
+      source_tier: ((r.quality_tier || r.source_tier || 4) as any) as SourceTier,
+      resource_type: r.resource_type || 'COURSE',
+      verification_status: r.verification_status,
+      level: r.difficulty || 'Intermediate',
+      language: r.language || 'English',
+      duration: r.estimated_duration || 'Self-paced',
+      url: r.url,
+    }));
 
     const response: DiscoveryResponse = {
       success: true,
       status,
       status_message: statusMessage,
       best_match: bestMatch,
+      strong_alternatives: strongAlternatives,
       other_options: otherOptions,
       all_resources: rankedResources,
+      comparison_table: comparisonTable,
       total_found: rankedResources.length,
       source_breakdown: {
         web_discovered: webCount,

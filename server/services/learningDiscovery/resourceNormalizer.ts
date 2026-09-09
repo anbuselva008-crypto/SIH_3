@@ -7,6 +7,7 @@ import type {
 } from './types.ts';
 import type { SearchCandidate } from './searchProvider.ts';
 import type { LearningResource } from '../../database/models.ts';
+import { VerificationService } from './verificationService.ts';
 
 export class ResourceNormalizer {
   /**
@@ -80,6 +81,15 @@ export class ResourceNormalizer {
     if (d.includes('mospi.gov.in')) {
       return {
         providerName: 'MoSPI / NSSTA',
+        providerType: 'Government',
+        sourceTier: 1,
+        verificationStatus: 'Verified',
+      };
+    }
+
+    if (d.includes('tamilvu.org')) {
+      return {
+        providerName: 'Tamil Virtual Academy (Govt of Tamil Nadu)',
         providerType: 'Government',
         sourceTier: 1,
         verificationStatus: 'Verified',
@@ -197,14 +207,30 @@ export class ResourceNormalizer {
       .replace(/\s*[-|–—]\s*(Coursera|edX|SWAYAM|NPTEL|YouTube|Wikipedia|Scribd|PDF).*$/i, '')
       .trim();
 
+    // Genuine language detection from candidate content (never invent language)
+    const candidateText = `${candidate.title} ${candidate.snippet} ${domain}`.toLowerCase();
+    let detectedLanguage = 'English';
+    if (candidateText.includes('tamil') || candidateText.includes('தமிழ்') || domain.includes('tamilvu.org')) {
+      detectedLanguage = 'Tamil';
+    } else if (candidateText.includes('hindi') || candidateText.includes('हिंदी') || candidateText.includes('bilingual (hindi')) {
+      detectedLanguage = 'Hindi';
+    } else if (candidateText.includes('telugu') || candidateText.includes('తెలుగు')) {
+      detectedLanguage = 'Telugu';
+    }
+
+    const finalTitle = cleanTitle || candidate.title;
+    const resType = VerificationService.detectResourceType(finalTitle, candidate.snippet || '', candidate.url);
+
     return {
       id: `web-${Date.now()}-${index}`,
-      title: cleanTitle || candidate.title,
+      title: finalTitle,
       url: candidate.url,
       canonical_url: canonicalUrl,
       provider_name: classification.providerName,
       provider_type: classification.providerType,
       source_tier: classification.sourceTier,
+      quality_tier: classification.sourceTier,
+      resource_type: resType,
       description: candidate.snippet || 'Learning resource discovered via public institutional search.',
       primary_competency: query.skillGap,
       secondary_competencies: [],
@@ -212,7 +238,7 @@ export class ResourceNormalizer {
       relevant_roles: query.roleName ? [query.roleName] : [],
       relevant_assignments: query.assignment ? [query.assignment] : [],
       difficulty: null, // DO NOT invent difficulty
-      language: query.preferredLanguage === 'hi' ? 'Hindi' : 'English', // Known from query or general web
+      language: detectedLanguage,
       estimated_duration: null, // DO NOT invent duration
       source_type: 'web_discovered',
       verification_status: classification.verificationStatus,
@@ -234,6 +260,8 @@ export class ResourceNormalizer {
     resource: LearningResource,
     query: DiscoveryQuery
   ): DiscoveredResource {
+    const resType = VerificationService.detectResourceType(resource.title, resource.description, '');
+
     return {
       id: `catalogue-${resource.id}`,
       title: resource.title,
@@ -244,6 +272,8 @@ export class ResourceNormalizer {
       provider_name: resource.source === 'iGOT' ? 'iGOT Karmayogi (Demo Catalogue)' : 'NSSTA / MoSPI (Demo Catalogue)',
       provider_type: 'Government',
       source_tier: 1,
+      quality_tier: 1,
+      resource_type: resType,
       description: resource.description,
       primary_competency: resource.competency,
       secondary_competencies: resource.secondary_competencies || [],
@@ -254,7 +284,7 @@ export class ResourceNormalizer {
       language: 'English',
       estimated_duration: resource.estimated_duration,
       source_type: 'demo_catalogue',
-      verification_status: 'Verified',
+      verification_status: 'VERIFIED',
       discovered_at: new Date().toISOString(),
       ranking_score: 0,
       match_reason: '',
